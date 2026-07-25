@@ -34,14 +34,16 @@ class ScopeView @JvmOverloads constructor(
     private var phase = 0.0
     private var lastFrameNanos = System.nanoTime()
 
-    var mode: String = "live"
+    var mode: String = "reconstructed"   // "reconstructed" or "captured"
     var capturedSamples: IntArray? = null
     var fidelityLabel: String = "RECONSTRUCTED"
 
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
-            if (mode == "live") invalidate()
+            // Always tick - reconstructed mode animates continuously,
+            // captured mode just needs to stay responsive to new frames.
+            if (mode == "reconstructed") invalidate()
             handler.postDelayed(this, 30)
         }
     }
@@ -71,7 +73,7 @@ class ScopeView @JvmOverloads constructor(
         if (mode == "captured" && capturedSamples != null) {
             drawCaptured(canvas, w, h)
         } else {
-            drawLive(canvas, w, h)
+            drawReconstructed(canvas, w, h)
         }
     }
 
@@ -88,7 +90,7 @@ class ScopeView @JvmOverloads constructor(
         }
     }
 
-    private fun drawLive(canvas: Canvas, w: Float, h: Float) {
+    private fun drawReconstructed(canvas: Canvas, w: Float, h: Float) {
         val now = System.nanoTime()
         val dt = (now - lastFrameNanos) / 1_000_000_000.0
         lastFrameNanos = now
@@ -112,6 +114,7 @@ class ScopeView @JvmOverloads constructor(
         }
     }
 
+    /** New real frame arrived - show it immediately regardless of tick timing. */
     fun showCaptured(samples: IntArray, label: String) {
         capturedSamples = samples
         fidelityLabel = label
@@ -119,8 +122,8 @@ class ScopeView @JvmOverloads constructor(
         invalidate()
     }
 
-    fun showLive() {
-        mode = "live"
+    fun showReconstructed() {
+        mode = "reconstructed"
         fidelityLabel = "RECONSTRUCTED · LIVE"
         invalidate()
     }
