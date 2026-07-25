@@ -1,195 +1,377 @@
 package com.signaldeck.scope
 
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
-import android.graphics.Canvas
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.Typeface
+import android.hardware.usb.UsbDevice
+import android.hardware.usb.UsbManager
+import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.util.AttributeSet
-import android.view.View
+import android.text.SpannableString
+import android.text.Spannable
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
+import android.widget.Button
+import android.widget.EditText
+import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 
-class ScopeView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null
-) : View(context, attrs) {
+class MainActivity : AppCompatActivity() {
 
-    private val bgPaint = Paint().apply { color = Color.parseColor("#050A06") }
-    private val gridPaint = Paint().apply { color = Color.argb(25, 77, 255, 160); strokeWidth = 1f }
-    private val midlinePaint = Paint().apply { color = Color.argb(55, 77, 255, 160); strokeWidth = 1f }
-    private val tracePaint = Paint().apply {
-        color = Color.parseColor("#4DFFA0")
-        strokeWidth = 4f
-        style = Paint.Style.STROKE
-        isAntiAlias = true
-    }
-    private val labelPaint = Paint().apply {
-        color = Color.parseColor("#4DFFA0")
-        textSize = 28f
-        isAntiAlias = true
-    }
-    private val axisPaint = Paint().apply {
-        color = Color.parseColor("#6F9A80")
-        textSize = 22f
-        isAntiAlias = true
-    }
-    private val axisLinePaint = Paint().apply {
-        color = Color.argb(80, 111, 154, 128)
-        strokeWidth = 2f
-    }
+    private lateinit var usbManager: UsbManager
+    private var serial: UsbSerialManager? = null
+    private var readThread: Thread? = null
+    @Volatile private var keepReading = false
 
-    var liveFreq: Double = 0.0
-    var liveDuty: Double = 50.0
-    var waveformPresent: Boolean = false
-    private var phase = 0.0
-    private var lastFrameNanos = System.nanoTime()
+    private lateinit var scopeView: ScopeView
+    private lateinit var connStatus: TextView
+    private lateinit var connectBtn: Button
+    private lateinit var liveCaptureBtn: Button
+    private lateinit var reconBtn: Button
+    private lateinit var cmdInput: EditText
+    private lateinit var sendBtn: Button
+    private lateinit var logView: TextView
+    private lateinit var rTarget: TextView
+    private lateinit var rMeasured: TextView
+    private lateinit var rDuty: TextView
+    private lateinit var rRate: TextView
+    private lateinit var rVoltage: TextView
+    private lateinit var speed025Btn: Button
+    private lateinit var speed05Btn: Button
+    private lateinit var speed1Btn: Button
+    private lateinit var speed2Btn: Button
+    private lateinit var speed4Btn: Button
 
-    var mode: String = "reconstructed"
-    var capturedSamples: IntArray? = null
-    var fidelityLabel: String = "RECONSTRUCTED"
-    var capturedSampleRateHz: Double = 0.0
+    private val ACTION_USB_PERMISSION = "com.signaldeck.scope.USB_PERMISSION"
 
-    private val handler = Handler(Looper.getMainLooper())
-    private val tick = object : Runnable {
+    private var capturing = false
+    private var capN = 0
+    private var capRate = 0.0
+    private var capSamples: IntArray? = null
+
+    private var lineBuffer = StringBuilder()
+    private var lastTargetHz = 0.0
+    private var lastMeasuredHz = 0.0
+    private var lastDuty = 50.0
+    private var lastWaveform = false
+
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var liveCaptureActive = false
+    private var speedMultiplier = 1.0
+    private var lastFrameArrivedMs = 0L
+    private val baseIntervalMs = 400L
+
+    private val liveCaptureLoop = object : Runnable {
         override fun run() {
-            if (mode == "reconstructed") invalidate()
-            handler.postDelayed(this, 30)
-        }
-    }
-
-    init {
-        handler.post(tick)
-    }
-
-    private val leftMargin = 70f
-    private val bottomMargin = 40f
-    private val topMargin = 40f
-    private val rightMargin = 10f
-
-    override fun onDraw(canvas: Canvas) {
-        val fullW = width.toFloat()
-        val fullH = height.toFloat()
-        canvas.drawRect(0f, 0f, fullW, fullH, bgPaint)
-
-        val plotLeft = leftMargin
-        val plotTop = topMargin
-        val plotRight = fullW - rightMargin
-        val plotBottom = fullH - bottomMargin
-        val plotW = plotRight - plotLeft
-        val plotH = plotBottom - plotTop
-
-        drawGridAndAxes(canvas, plotLeft, plotTop, plotRight, plotBottom, plotW, plotH)
-
-        canvas.drawText(fidelityLabel, plotLeft, 24f, labelPaint)
-
-        if (mode == "captured" && capturedSamples != null) {
-            drawCaptured(canvas, plotLeft, plotTop, plotW, plotH)
-        } else {
-            drawReconstructed(canvas, plotLeft, plotTop, plotW, plotH)
-        }
-    }
-
-    private fun drawGridAndAxes(
-        canvas: Canvas, left: Float, top: Float, right: Float, bottom: Float, w: Float, h: Float
-    ) {
-        val cols = 10
-        val rows = 8
-
-        for (i in 0..cols) {
-            val x = left + (w / cols) * i
-            canvas.drawLine(x, top, x, bottom, gridPaint)
-        }
-        for (i in 0..rows) {
-            val y = top + (h / rows) * i
-            canvas.drawLine(left, y, right, y, gridPaint)
-        }
-        canvas.drawLine(left, top + h / 2, right, top + h / 2, midlinePaint)
-
-        canvas.drawLine(left, top, left, bottom, axisLinePaint)
-        canvas.drawLine(left, bottom, right, bottom, axisLinePaint)
-
-        if (mode == "captured" && capturedSamples != null) {
-            val voltsPerRow = 5.0f / rows
-            for (i in 0..rows) {
-                val v = 5.0f - (voltsPerRow * i)
-                val y = top + (h / rows) * i
-                canvas.drawText("%.1fV".format(v), 4f, y + 8f, axisPaint)
+            if (!liveCaptureActive) return
+            if (!capturing) {
+                serial?.writeLine("C")
             }
-        } else {
-            canvas.drawText("HIGH", 4f, top + 14f, axisPaint)
-            canvas.drawText("LOW", 4f, bottom - 4f, axisPaint)
-            canvas.drawText("(no voltage", 4f, top + h / 2 - 6f, axisPaint)
-            canvas.drawText("measurement)", 4f, top + h / 2 + 16f, axisPaint)
+            val interval = (baseIntervalMs / speedMultiplier).toLong().coerceAtLeast(60L)
+            uiHandler.postDelayed(this, interval)
         }
+    }
 
-        if (mode == "captured" && capturedSampleRateHz > 0 && capturedSamples != null) {
-            val totalSamples = capturedSamples!!.size
-            val totalTimeMs = (totalSamples / capturedSampleRateHz) * 1000.0
-            for (i in 0..cols) {
-                val t = (totalTimeMs / cols) * i
-                val x = left + (w / cols) * i
-                val label = if (totalTimeMs < 2.0) "%.2fms".format(t) else "%.1fms".format(t)
-                canvas.drawText(label, x, bottom + 26f, axisPaint)
+    private val usbReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            try {
+                when (intent.action) {
+                    ACTION_USB_PERMISSION -> {
+                        synchronized(this) {
+                            val device: UsbDevice? =
+                                if (Build.VERSION.SDK_INT >= 33)
+                                    intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                                else
+                                    @Suppress("DEPRECATION") intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                            if (granted && device != null) {
+                                connectToDevice(device)
+                            } else {
+                                appendLog("Permission denied for USB device.")
+                            }
+                        }
+                    }
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                        appendLog("Arduino attached. Tap Connect.")
+                    }
+                    UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                        appendLog("Device detached.")
+                        disconnect()
+                    }
+                }
+            } catch (e: Exception) {
+                appendLog("CRASH in usbReceiver: " + e.toString())
             }
-            canvas.drawText("TIME (real, from measured sample rate)", (left + right) / 2 - 130f, bottom + 38f, axisPaint)
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+
+        scopeView = findViewById(R.id.scopeView)
+        connStatus = findViewById(R.id.connStatus)
+        connectBtn = findViewById(R.id.connectBtn)
+        liveCaptureBtn = findViewById(R.id.liveCaptureBtn)
+        reconBtn = findViewById(R.id.reconBtn)
+        cmdInput = findViewById(R.id.cmdInput)
+        sendBtn = findViewById(R.id.sendBtn)
+        logView = findViewById(R.id.logView)
+        rTarget = findViewById(R.id.rTarget)
+        rMeasured = findViewById(R.id.rMeasured)
+        rDuty = findViewById(R.id.rDuty)
+        rRate = findViewById(R.id.rRate)
+        rVoltage = findViewById(R.id.rVoltage)
+        speed025Btn = findViewById(R.id.speed025Btn)
+        speed05Btn = findViewById(R.id.speed05Btn)
+        speed1Btn = findViewById(R.id.speed1Btn)
+        speed2Btn = findViewById(R.id.speed2Btn)
+        speed4Btn = findViewById(R.id.speed4Btn)
+
+        val filter = IntentFilter().apply {
+            addAction(ACTION_USB_PERMISSION)
+            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
-            for (i in 0..cols) {
-                val x = left + (w / cols) * i
-                val cyclesLabel = "%.1f".format((i.toDouble() / cols) * 4.0)
-                canvas.drawText(cyclesLabel, x, bottom + 26f, axisPaint)
+            registerReceiver(usbReceiver, filter)
+        }
+
+        connectBtn.setOnClickListener {
+            try {
+                if (serial != null) disconnect() else requestDevice()
+            } catch (e: Exception) {
+                appendLog("CRASH on Connect tap: " + e.toString())
             }
-            canvas.drawText("CYCLES (synthetic - no real timebase)", (left + right) / 2 - 110f, bottom + 38f, axisPaint)
+        }
+
+        liveCaptureBtn.setOnClickListener {
+            if (liveCaptureActive) {
+                liveCaptureActive = false
+                liveCaptureBtn.text = "Start Live Capture"
+                appendLog("Live capture stopped.")
+            } else {
+                liveCaptureActive = true
+                liveCaptureBtn.text = "Stop Live Capture"
+                appendLog("Live capture started.")
+                uiHandler.post(liveCaptureLoop)
+            }
+        }
+
+        reconBtn.setOnClickListener {
+            liveCaptureActive = false
+            liveCaptureBtn.text = "Start Live Capture"
+            rVoltage.text = "Voltage: -- (no real capture yet)"
+            scopeView.showReconstructed()
+        }
+
+        speed025Btn.setOnClickListener { setSpeed(0.25) }
+        speed05Btn.setOnClickListener { setSpeed(0.5) }
+        speed1Btn.setOnClickListener { setSpeed(1.0) }
+        speed2Btn.setOnClickListener { setSpeed(2.0) }
+        speed4Btn.setOnClickListener { setSpeed(4.0) }
+
+        sendBtn.setOnClickListener {
+            val text = cmdInput.text.toString().trim()
+            if (text.isNotEmpty()) {
+                appendCommandLog(text)
+                serial?.writeLine(text)
+                cmdInput.setText("")
+            }
         }
     }
 
-    private fun drawCaptured(canvas: Canvas, left: Float, top: Float, w: Float, h: Float) {
-        val samples = capturedSamples ?: return
-        if (samples.isEmpty()) return
-        var prevX = 0f; var prevY = 0f
-        for (i in samples.indices) {
-            val x = left + (i.toFloat() / (samples.size - 1)) * w
-            val voltage = (samples[i] / 255.0) * 5.0
-            val v = voltage / 5.0
-            val y = top + h - (v.toFloat() * h)
-            if (i > 0) canvas.drawLine(prevX, prevY, x, y, tracePaint)
-            prevX = x; prevY = y
+    private fun setSpeed(mult: Double) {
+        speedMultiplier = mult
+        appendLog("Live capture speed set to ${mult}x")
+    }
+
+    private fun requestDevice() {
+        val devices = usbManager.deviceList.values
+        if (devices.isEmpty()) {
+            appendLog("No USB device found. Check the cable and that the Arduino is plugged in.")
+            return
+        }
+        val device = devices.first()
+        val usbPermissionIntent = Intent(ACTION_USB_PERMISSION).apply {
+            setPackage(packageName)
+        }
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
+            PendingIntent.FLAG_MUTABLE else 0
+        val permissionIntent = PendingIntent.getBroadcast(
+            this, 0, usbPermissionIntent, flags
+        )
+        if (usbManager.hasPermission(device)) {
+            connectToDevice(device)
+        } else {
+            usbManager.requestPermission(device, permissionIntent)
         }
     }
 
-    private fun drawReconstructed(canvas: Canvas, left: Float, top: Float, w: Float, h: Float) {
-        val now = System.nanoTime()
-        val dt = (now - lastFrameNanos) / 1_000_000_000.0
-        lastFrameNanos = now
-
-        val freq = liveFreq
-        if (freq <= 0) return
-        val duty = (liveDuty / 100.0).coerceIn(0.01, 0.99)
-
-        phase += dt * freq
-        val cyclesShown = 4.0
-        val steps = 400
-        var prevX = 0f; var prevY = 0f
-        for (i in 0..steps) {
-            val t = (i.toDouble() / steps) * cyclesShown
-            val localPhase = (t + phase) % 1.0
-            val high = localPhase < duty
-            val x = left + (i.toFloat() / steps) * w
-            val y = if (high) top + h * 0.05f else top + h * 0.95f
-            if (i > 0) canvas.drawLine(prevX, prevY, x, y, tracePaint)
-            prevX = x; prevY = y
+    private fun connectToDevice(device: UsbDevice) {
+        try {
+            val mgr = UsbSerialManager(usbManager, device)
+            val opened = mgr.open(250000)
+            if (!opened) {
+                appendLog("Failed to open device as CDC-ACM serial.")
+                return
+            }
+            serial = mgr
+            connStatus.text = "Connected · 250000 baud"
+            connStatus.setTextColor(0xFF4DFFA0.toInt())
+            startReadLoop()
+        } catch (e: Exception) {
+            appendLog("CRASH in connectToDevice: " + e.toString())
         }
     }
 
-    fun showCaptured(samples: IntArray, label: String, sampleRateHz: Double) {
-        capturedSamples = samples
-        capturedSampleRateHz = sampleRateHz
-        fidelityLabel = label
-        mode = "captured"
-        invalidate()
+    private fun disconnect() {
+        keepReading = false
+        liveCaptureActive = false
+        liveCaptureBtn.text = "Start Live Capture"
+        readThread = null
+        serial?.close()
+        serial = null
+        connStatus.text = "Not connected"
+        connStatus.setTextColor(0xFFFF5A5A.toInt())
     }
 
-    fun showReconstructed() {
-        mode = "reconstructed"
-        fidelityLabel = "RECONSTRUCTED · LIVE"
-        invalidate()
+    private fun startReadLoop() {
+        keepReading = true
+        readThread = Thread {
+            val buf = ByteArray(512)
+            while (keepReading) {
+                val n = try { serial?.read(buf, 200) ?: -1 } catch (e: Exception) { -1 }
+                if (n > 0) {
+                    val chunk = String(buf, 0, n, Charsets.US_ASCII)
+                    lineBuffer.append(chunk)
+                    var idx: Int
+                    while (lineBuffer.indexOf("\n").also { idx = it } >= 0) {
+                        val line = lineBuffer.substring(0, idx).trim()
+                        lineBuffer.delete(0, idx + 1)
+                        runOnUiThread { handleLine(line) }
+                    }
+                }
+            }
+        }
+        readThread?.start()
+    }
+
+    private fun handleLine(line: String) {
+        if (line.startsWith("AI>")) {
+            appendLog(line)
+            return
+        }
+        if (line.startsWith("CAP,")) {
+            val parts = line.split(",")
+            capturing = true
+            capN = parts.getOrNull(1)?.toIntOrNull() ?: 0
+            capRate = parts.getOrNull(2)?.toDoubleOrNull() ?: 0.0
+            capSamples = null
+            return
+        }
+        if (capturing) {
+            if (line == "ENDCAP") {
+                capturing = false
+                onCaptureComplete()
+                return
+            }
+            if (line.isNotEmpty() && line.matches(Regex("^[0-9,]+$"))) {
+                capSamples = line.split(",").map { it.toIntOrNull() ?: 0 }.toIntArray()
+                return
+            }
+        }
+        if (line.startsWith("Target:")) {
+            parseStatusLine(line)
+            return
+        }
+        appendLog(line)
+    }
+
+    private fun parseStatusLine(line: String) {
+        Regex("Target:\\s*([\\d.]+)").find(line)?.let { lastTargetHz = it.groupValues[1].toDouble() }
+        val noSignal = line.contains("NO SIGNAL")
+        if (!noSignal) {
+            Regex("Measured:\\s*([\\d.]+)").find(line)?.let { lastMeasuredHz = it.groupValues[1].toDouble() }
+        }
+        Regex("Duty:\\s*([\\d.]+)").find(line)?.let { lastDuty = it.groupValues[1].toDouble() }
+        lastWaveform = !noSignal
+
+        rTarget.text = "Target: %.2f Hz".format(lastTargetHz)
+        rMeasured.text = if (lastWaveform) "Measured: %.2f Hz".format(lastMeasuredHz) else "Measured: NO SIGNAL"
+        rDuty.text = "Duty: %.1f%%".format(lastDuty)
+
+        scopeView.liveFreq = if (lastWaveform) lastMeasuredHz else lastTargetHz
+        scopeView.liveDuty = lastDuty
+        scopeView.waveformPresent = lastWaveform
+    }
+
+    private fun onCaptureComplete() {
+        val samples = capSamples ?: return
+        val freq = if (lastWaveform) lastMeasuredHz else lastTargetHz
+        val spc = if (freq > 0) capRate / freq else 0.0
+
+        val now = System.currentTimeMillis()
+        val fps = if (lastFrameArrivedMs > 0) 1000.0 / (now - lastFrameArrivedMs) else 0.0
+        lastFrameArrivedMs = now
+        if (liveCaptureActive) {
+            rRate.text = "Real frame rate: %.1f fps (speed %.2fx)".format(fps, speedMultiplier)
+        }
+
+        if (samples.isNotEmpty()) {
+            val minRaw = samples.min()
+            val maxRaw = samples.max()
+            val avgRaw = samples.average()
+            val minV = (minRaw / 255.0) * 5.0
+            val maxV = (maxRaw / 255.0) * 5.0
+            val avgV = (avgRaw / 255.0) * 5.0
+            val vpp = maxV - minV
+            rVoltage.text = "Voltage: min %.2fV | max %.2fV | avg %.2fV | Vpp %.2fV (real ADC readings)"
+                .format(minV, maxV, avgV, vpp)
+        }
+
+        val label = when {
+            spc >= 10 -> "CAPTURED · HIGH FIDELITY (%.1f samples/cycle)".format(spc)
+            spc >= 4 -> "CAPTURED · REDUCED DETAIL (%.1f samples/cycle)".format(spc)
+            else -> "TOO FAST TO CAPTURE - SWITCH TO RECONSTRUCTED"
+        }
+
+        if (spc >= 4) {
+            scopeView.showCaptured(samples, label, capRate)
+        } else {
+            scopeView.showReconstructed()
+        }
+    }
+
+    private fun appendLog(line: String) {
+        runOnUiThread { logView.append(line + "\n") }
+    }
+
+    private fun appendCommandLog(text: String) {
+        runOnUiThread {
+            val display = ">> $text\n"
+            val spannable = SpannableString(display)
+            spannable.setSpan(ForegroundColorSpan(Color.RED), 0, display.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spannable.setSpan(StyleSpan(Typeface.BOLD), 0, display.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            logView.append(spannable)
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        keepReading = false
+        liveCaptureActive = false
+        try { unregisterReceiver(usbReceiver) } catch (e: Exception) {}
+        serial?.close()
     }
 }
