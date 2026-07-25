@@ -9,6 +9,8 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -24,14 +26,20 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scopeView: ScopeView
     private lateinit var connStatus: TextView
     private lateinit var connectBtn: Button
-    private lateinit var captureBtn: Button
-    private lateinit var liveBtn: Button
+    private lateinit var liveCaptureBtn: Button
+    private lateinit var reconBtn: Button
     private lateinit var cmdInput: EditText
     private lateinit var sendBtn: Button
     private lateinit var logView: TextView
     private lateinit var rTarget: TextView
     private lateinit var rMeasured: TextView
     private lateinit var rDuty: TextView
+    private lateinit var rRate: TextView
+    private lateinit var speed025Btn: Button
+    private lateinit var speed05Btn: Button
+    private lateinit var speed1Btn: Button
+    private lateinit var speed2Btn: Button
+    private lateinit var speed4Btn: Button
 
     private val ACTION_USB_PERMISSION = "com.signaldeck.scope.USB_PERMISSION"
 
@@ -45,7 +53,24 @@ class MainActivity : AppCompatActivity() {
     private var lastMeasuredHz = 0.0
     private var lastDuty = 50.0
     private var lastWaveform = false
-    private var diagCount = 0
+
+    // --- Live capture loop state ---
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private var liveCaptureActive = false
+    private var speedMultiplier = 1.0
+    private var lastFrameArrivedMs = 0L
+    private val baseIntervalMs = 400L   // "1x" pace: roughly 2-3 real frames/sec, USB+ADC allowing
+
+    private val liveCaptureLoop = object : Runnable {
+        override fun run() {
+            if (!liveCaptureActive) return
+            if (!capturing) {
+                serial?.writeLine("C")
+            }
+            val interval = (baseIntervalMs / speedMultiplier).toLong().coerceAtLeast(60L)
+            uiHandler.postDelayed(this, interval)
+        }
+    }
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -89,14 +114,20 @@ class MainActivity : AppCompatActivity() {
         scopeView = findViewById(R.id.scopeView)
         connStatus = findViewById(R.id.connStatus)
         connectBtn = findViewById(R.id.connectBtn)
-        captureBtn = findViewById(R.id.captureBtn)
-        liveBtn = findViewById(R.id.liveBtn)
+        liveCaptureBtn = findViewById(R.id.liveCaptureBtn)
+        reconBtn = findViewById(R.id.reconBtn)
         cmdInput = findViewById(R.id.cmdInput)
         sendBtn = findViewById(R.id.sendBtn)
         logView = findViewById(R.id.logView)
         rTarget = findViewById(R.id.rTarget)
         rMeasured = findViewById(R.id.rMeasured)
         rDuty = findViewById(R.id.rDuty)
+        rRate = findViewById(R.id.rRate)
+        speed025Btn = findViewById(R.id.speed025Btn)
+        speed05Btn = findViewById(R.id.speed05Btn)
+        speed1Btn = findViewById(R.id.speed1Btn)
+        speed2Btn = findViewById(R.id.speed2Btn)
+        speed4Btn = findViewById(R.id.speed4Btn)
 
         val filter = IntentFilter().apply {
             addAction(ACTION_USB_PERMISSION)
@@ -116,21 +147,44 @@ class MainActivity : AppCompatActivity() {
                 appendLog("CRASH on Connect tap: " + e.toString())
             }
         }
-        captureBtn.setOnClickListener {
-            appendLog("Requesting capture...")
-            serial?.writeLine("C")
+
+        liveCaptureBtn.setOnClickListener {
+            if (liveCaptureActive) {
+                liveCaptureActive = false
+                liveCaptureBtn.text = "Start Live Capture"
+                appendLog("Live capture stopped.")
+            } else {
+                liveCaptureActive = true
+                liveCaptureBtn.text = "Stop Live Capture"
+                appendLog("Live capture started - pulling real frames continuously.")
+                uiHandler.post(liveCaptureLoop)
+            }
         }
-        liveBtn.setOnClickListener {
-            scopeView.showLive()
+
+        reconBtn.setOnClickListener {
+            liveCaptureActive = false
+            liveCaptureBtn.text = "Start Live Capture"
+            scopeView.showReconstructed()
         }
+
+        speed025Btn.setOnClickListener { setSpeed(0.25) }
+        speed05Btn.setOnClickListener { setSpeed(0.5) }
+        speed1Btn.setOnClickListener { setSpeed(1.0) }
+        speed2Btn.setOnClickListener { setSpeed(2.0) }
+        speed4Btn.setOnClickListener { setSpeed(4.0) }
+
         sendBtn.setOnClickListener {
             val text = cmdInput.text.toString().trim()
             if (text.isNotEmpty()) {
-                appendLog(">> sending: $text")
                 serial?.writeLine(text)
                 cmdInput.setText("")
             }
         }
+    }
+
+    private fun setSpeed(mult: Double) {
+        speedMultiplier = mult
+        appendLog("Live capture speed set to ${mult}x")
     }
 
     private fun requestDevice() {
@@ -166,7 +220,6 @@ class MainActivity : AppCompatActivity() {
             serial = mgr
             connStatus.text = "Connected · 250000 baud"
             connStatus.setTextColor(0xFF4DFFA0.toInt())
-            appendLog("DIAG: opened OK. epIn=" + mgr.debugInInfo() + " epOut=" + mgr.debugOutInfo())
             startReadLoop()
         } catch (e: Exception) {
             appendLog("CRASH in connectToDevice: " + e.toString())
@@ -175,6 +228,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun disconnect() {
         keepReading = false
+        liveCaptureActive = false
+        liveCaptureBtn.text = "Start Live Capture"
         readThread = null
         serial?.close()
         serial = null
@@ -184,19 +239,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun startReadLoop() {
         keepReading = true
-        diagCount = 0
         readThread = Thread {
             val buf = ByteArray(512)
             while (keepReading) {
-                val n = try { serial?.read(buf, 200) ?: -1 } catch (e: Exception) {
-                    runOnUiThread { appendLog("DIAG read exception: " + e.toString()) }
-                    -1
-                }
-                if (diagCount < 15) {
-                    diagCount++
-                    val preview = if (n > 0) String(buf, 0, minOf(n, 40), Charsets.US_ASCII) else "(none)"
-                    runOnUiThread { appendLog("DIAG read#$diagCount -> n=$n bytes=[$preview]") }
-                }
+                val n = try { serial?.read(buf, 200) ?: -1 } catch (e: Exception) { -1 }
                 if (n > 0) {
                     val chunk = String(buf, 0, n, Charsets.US_ASCII)
                     lineBuffer.append(chunk)
@@ -265,16 +311,25 @@ class MainActivity : AppCompatActivity() {
         val samples = capSamples ?: return
         val freq = if (lastWaveform) lastMeasuredHz else lastTargetHz
         val spc = if (freq > 0) capRate / freq else 0.0
+
+        val now = System.currentTimeMillis()
+        val fps = if (lastFrameArrivedMs > 0) 1000.0 / (now - lastFrameArrivedMs) else 0.0
+        lastFrameArrivedMs = now
+        if (liveCaptureActive) {
+            rRate.text = "Real frame rate: %.1f fps (speed %.2fx)".format(fps, speedMultiplier)
+        }
+
         val label = when {
             spc >= 10 -> "CAPTURED · HIGH FIDELITY (%.1f samples/cycle)".format(spc)
             spc >= 4 -> "CAPTURED · REDUCED DETAIL (%.1f samples/cycle)".format(spc)
-            else -> "TOO FAST TO CAPTURE - SHOWING RECONSTRUCTION"
+            else -> "TOO FAST TO CAPTURE - SWITCH TO RECONSTRUCTED"
         }
-        appendLog("Capture done. Real sample rate: %.1f sps".format(capRate))
+
         if (spc >= 4) {
             scopeView.showCaptured(samples, label)
         } else {
-            scopeView.showLive()
+            if (!liveCaptureActive) appendLog("Capture done. Real sample rate: %.1f sps".format(capRate))
+            scopeView.showReconstructed()
         }
     }
 
@@ -285,6 +340,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         keepReading = false
+        liveCaptureActive = false
         try { unregisterReceiver(usbReceiver) } catch (e: Exception) {}
         serial?.close()
     }
