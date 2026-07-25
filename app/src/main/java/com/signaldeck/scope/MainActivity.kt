@@ -48,25 +48,33 @@ class MainActivity : AppCompatActivity() {
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            when (intent.action) {
-                ACTION_USB_PERMISSION -> {
-                    synchronized(this) {
-                        val device: UsbDevice? = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
-                        val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
-                        if (granted && device != null) {
-                            connectToDevice(device)
-                        } else {
-                            appendLog("Permission denied for USB device.")
+            try {
+                when (intent.action) {
+                    ACTION_USB_PERMISSION -> {
+                        synchronized(this) {
+                            val device: UsbDevice? =
+                                if (Build.VERSION.SDK_INT >= 33)
+                                    intent.getParcelableExtra(UsbManager.EXTRA_DEVICE, UsbDevice::class.java)
+                                else
+                                    @Suppress("DEPRECATION") intent.getParcelableExtra(UsbManager.EXTRA_DEVICE)
+                            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+                            if (granted && device != null) {
+                                connectToDevice(device)
+                            } else {
+                                appendLog("Permission denied for USB device.")
+                            }
                         }
                     }
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                        appendLog("Arduino attached. Tap Connect.")
+                    }
+                    UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                        appendLog("Device detached.")
+                        disconnect()
+                    }
                 }
-                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-                    appendLog("Arduino attached. Tap Connect.")
-                }
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-                    appendLog("Device detached.")
-                    disconnect()
-                }
+            } catch (e: Exception) {
+                appendLog("CRASH in usbReceiver: " + e.toString())
             }
         }
     }
@@ -101,7 +109,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         connectBtn.setOnClickListener {
-            if (serial != null) disconnect() else requestDevice()
+            try {
+                if (serial != null) disconnect() else requestDevice()
+            } catch (e: Exception) {
+                appendLog("CRASH on Connect tap: " + e.toString())
+            }
         }
         captureBtn.setOnClickListener {
             appendLog("Requesting capture...")
@@ -139,15 +151,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun connectToDevice(device: UsbDevice) {
-        val mgr = UsbSerialManager(usbManager, device)
-        if (!mgr.open(250000)) {
-            appendLog("Failed to open device as CDC-ACM serial.")
-            return
+        try {
+            val mgr = UsbSerialManager(usbManager, device)
+            val opened = mgr.open(250000)
+            if (!opened) {
+                appendLog("Failed to open device as CDC-ACM serial.")
+                return
+            }
+            serial = mgr
+            connStatus.text = "Connected · 250000 baud"
+            connStatus.setTextColor(0xFF4DFFA0.toInt())
+            startReadLoop()
+        } catch (e: Exception) {
+            appendLog("CRASH in connectToDevice: " + e.toString())
         }
-        serial = mgr
-        connStatus.text = "Connected · 250000 baud"
-        connStatus.setTextColor(0xFF4DFFA0.toInt())
-        startReadLoop()
     }
 
     private fun disconnect() {
@@ -164,7 +181,7 @@ class MainActivity : AppCompatActivity() {
         readThread = Thread {
             val buf = ByteArray(512)
             while (keepReading) {
-                val n = serial?.read(buf, 200) ?: -1
+                val n = try { serial?.read(buf, 200) ?: -1 } catch (e: Exception) { -1 }
                 if (n > 0) {
                     val chunk = String(buf, 0, n, Charsets.US_ASCII)
                     lineBuffer.append(chunk)
@@ -247,7 +264,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun appendLog(line: String) {
-        logView.append(line + "\n")
+        runOnUiThread { logView.append(line + "\n") }
     }
 
     override fun onDestroy() {
