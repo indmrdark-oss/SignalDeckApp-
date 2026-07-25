@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
     private var lastMeasuredHz = 0.0
     private var lastDuty = 50.0
     private var lastWaveform = false
+    private var diagCount = 0
 
     private val usbReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -125,6 +126,7 @@ class MainActivity : AppCompatActivity() {
         sendBtn.setOnClickListener {
             val text = cmdInput.text.toString().trim()
             if (text.isNotEmpty()) {
+                appendLog(">> sending: $text")
                 serial?.writeLine(text)
                 cmdInput.setText("")
             }
@@ -138,9 +140,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val device = devices.first()
-
-        // Explicit intent targeting this exact app/receiver - required on Android 14+ (API 34)
-        // when combined with FLAG_MUTABLE, per the new PendingIntent security rules.
         val usbPermissionIntent = Intent(ACTION_USB_PERMISSION).apply {
             setPackage(packageName)
         }
@@ -167,6 +166,7 @@ class MainActivity : AppCompatActivity() {
             serial = mgr
             connStatus.text = "Connected · 250000 baud"
             connStatus.setTextColor(0xFF4DFFA0.toInt())
+            appendLog("DIAG: opened OK. epIn=" + mgr.debugInInfo() + " epOut=" + mgr.debugOutInfo())
             startReadLoop()
         } catch (e: Exception) {
             appendLog("CRASH in connectToDevice: " + e.toString())
@@ -184,10 +184,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun startReadLoop() {
         keepReading = true
+        diagCount = 0
         readThread = Thread {
             val buf = ByteArray(512)
             while (keepReading) {
-                val n = try { serial?.read(buf, 200) ?: -1 } catch (e: Exception) { -1 }
+                val n = try { serial?.read(buf, 200) ?: -1 } catch (e: Exception) {
+                    runOnUiThread { appendLog("DIAG read exception: " + e.toString()) }
+                    -1
+                }
+                if (diagCount < 15) {
+                    diagCount++
+                    val preview = if (n > 0) String(buf, 0, minOf(n, 40), Charsets.US_ASCII) else "(none)"
+                    runOnUiThread { appendLog("DIAG read#$diagCount -> n=$n bytes=[$preview]") }
+                }
                 if (n > 0) {
                     val chunk = String(buf, 0, n, Charsets.US_ASCII)
                     lineBuffer.append(chunk)
