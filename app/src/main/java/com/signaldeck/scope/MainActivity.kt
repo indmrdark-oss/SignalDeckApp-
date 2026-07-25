@@ -138,10 +138,16 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val device = devices.first()
+
+        // Explicit intent targeting this exact app/receiver - required on Android 14+ (API 34)
+        // when combined with FLAG_MUTABLE, per the new PendingIntent security rules.
+        val usbPermissionIntent = Intent(ACTION_USB_PERMISSION).apply {
+            setPackage(packageName)
+        }
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
             PendingIntent.FLAG_MUTABLE else 0
         val permissionIntent = PendingIntent.getBroadcast(
-            this, 0, Intent(ACTION_USB_PERMISSION), flags
+            this, 0, usbPermissionIntent, flags
         )
         if (usbManager.hasPermission(device)) {
             connectToDevice(device)
