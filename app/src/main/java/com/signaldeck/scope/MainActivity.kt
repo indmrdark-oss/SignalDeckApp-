@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rMeasured: TextView
     private lateinit var rDuty: TextView
     private lateinit var rRate: TextView
+    private lateinit var rVoltage: TextView
     private lateinit var speed025Btn: Button
     private lateinit var speed05Btn: Button
     private lateinit var speed1Btn: Button
@@ -128,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         rMeasured = findViewById(R.id.rMeasured)
         rDuty = findViewById(R.id.rDuty)
         rRate = findViewById(R.id.rRate)
+        rVoltage = findViewById(R.id.rVoltage)
         speed025Btn = findViewById(R.id.speed025Btn)
         speed05Btn = findViewById(R.id.speed05Btn)
         speed1Btn = findViewById(R.id.speed1Btn)
@@ -169,6 +171,7 @@ class MainActivity : AppCompatActivity() {
         reconBtn.setOnClickListener {
             liveCaptureActive = false
             liveCaptureBtn.text = "Start Live Capture"
+            rVoltage.text = "Voltage: -- (no real capture yet)"
             scopeView.showReconstructed()
         }
 
@@ -325,6 +328,18 @@ class MainActivity : AppCompatActivity() {
             rRate.text = "Real frame rate: %.1f fps (speed %.2fx)".format(fps, speedMultiplier)
         }
 
+        if (samples.isNotEmpty()) {
+            val minRaw = samples.min()
+            val maxRaw = samples.max()
+            val avgRaw = samples.average()
+            val minV = (minRaw / 255.0) * 5.0
+            val maxV = (maxRaw / 255.0) * 5.0
+            val avgV = (avgRaw / 255.0) * 5.0
+            val vpp = maxV - minV
+            rVoltage.text = "Voltage: min %.2fV | max %.2fV | avg %.2fV | Vpp %.2fV (real ADC readings)"
+                .format(minV, maxV, avgV, vpp)
+        }
+
         val label = when {
             spc >= 10 -> "CAPTURED · HIGH FIDELITY (%.1f samples/cycle)".format(spc)
             spc >= 4 -> "CAPTURED · REDUCED DETAIL (%.1f samples/cycle)".format(spc)
@@ -332,7 +347,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (spc >= 4) {
-            scopeView.showCaptured(samples, label)
+            scopeView.showCaptured(samples, label, capRate)
         } else {
             scopeView.showReconstructed()
         }
