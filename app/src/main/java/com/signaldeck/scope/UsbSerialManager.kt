@@ -37,10 +37,6 @@ class UsbSerialManager(
             }
         }
 
-        // Fallback: many Uno clones use a CH340 chip, which reports itself as
-        // vendor-specific (0xFF) rather than standard CDC. If we didn't find a
-        // proper CDC data interface, just grab the first interface that has
-        // bulk IN/OUT endpoints and treat it as the data channel.
         if (dataInterface == null) {
             for (i in 0 until device.interfaceCount) {
                 val intf = device.getInterface(i)
@@ -95,8 +91,6 @@ class UsbSerialManager(
         return true
     }
 
-    // CH340-specific vendor initialization sequence to set the baud rate.
-    // This chip does not speak standard CDC control commands.
     private fun configureCh340Baud(conn: UsbDeviceConnection, baudRate: Int) {
         val ch340BaudBase = 1532620800
         val divisor = ch340BaudBase / baudRate
@@ -127,4 +121,7 @@ class UsbSerialManager(
         } catch (e: Exception) {
         }
     }
+
+    fun debugInInfo(): String = "addr=${epIn?.address} type=${epIn?.type} isCh340=$isCh340"
+    fun debugOutInfo(): String = "addr=${epOut?.address} type=${epOut?.type}"
 }
