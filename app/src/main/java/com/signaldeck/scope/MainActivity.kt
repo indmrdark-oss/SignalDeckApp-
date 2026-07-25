@@ -5,12 +5,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Color
+import android.graphics.Typeface
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.text.SpannableString
+import android.text.Spannable
+import android.text.style.ForegroundColorSpan
+import android.text.style.StyleSpan
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
@@ -54,12 +60,11 @@ class MainActivity : AppCompatActivity() {
     private var lastDuty = 50.0
     private var lastWaveform = false
 
-    // --- Live capture loop state ---
     private val uiHandler = Handler(Looper.getMainLooper())
     private var liveCaptureActive = false
     private var speedMultiplier = 1.0
     private var lastFrameArrivedMs = 0L
-    private val baseIntervalMs = 400L   // "1x" pace: roughly 2-3 real frames/sec, USB+ADC allowing
+    private val baseIntervalMs = 400L
 
     private val liveCaptureLoop = object : Runnable {
         override fun run() {
@@ -156,7 +161,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 liveCaptureActive = true
                 liveCaptureBtn.text = "Stop Live Capture"
-                appendLog("Live capture started - pulling real frames continuously.")
+                appendLog("Live capture started.")
                 uiHandler.post(liveCaptureLoop)
             }
         }
@@ -176,6 +181,7 @@ class MainActivity : AppCompatActivity() {
         sendBtn.setOnClickListener {
             val text = cmdInput.text.toString().trim()
             if (text.isNotEmpty()) {
+                appendCommandLog(text)
                 serial?.writeLine(text)
                 cmdInput.setText("")
             }
@@ -328,13 +334,22 @@ class MainActivity : AppCompatActivity() {
         if (spc >= 4) {
             scopeView.showCaptured(samples, label)
         } else {
-            if (!liveCaptureActive) appendLog("Capture done. Real sample rate: %.1f sps".format(capRate))
             scopeView.showReconstructed()
         }
     }
 
     private fun appendLog(line: String) {
         runOnUiThread { logView.append(line + "\n") }
+    }
+
+    private fun appendCommandLog(text: String) {
+        runOnUiThread {
+            val display = ">> $text\n"
+            val spannable = SpannableString(display)
+            spannable.setSpan(ForegroundColorSpan(Color.RED), 0, display.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            spannable.setSpan(StyleSpan(Typeface.BOLD), 0, display.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+            logView.append(spannable)
+        }
     }
 
     override fun onDestroy() {
