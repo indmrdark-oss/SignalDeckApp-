@@ -53,8 +53,18 @@
         <com.signaldeck.scope.ScopeView
             android:id="@+id/scopeView"
             android:layout_width="match_parent"
-            android:layout_height="240dp"
+            android:layout_height="260dp"
             android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/rVoltage"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Voltage: -- (no real capture yet)"
+            android:textColor="#4DFFA0"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp" />
 
         <TextView
             android:id="@+id/rRate"
