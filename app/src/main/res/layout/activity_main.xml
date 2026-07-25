@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#070B08">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SIGNAL DECK"
+            android:textColor="#4DFFA0"
+            android:textSize="30sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="NATIVE USB SCOPE PANEL"
+            android:textColor="#6F9A80"
+            android:textSize="11sp"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:background="#0D150E"
+            android:padding="12dp"
+            android:layout_marginBottom="12dp"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/connStatus"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Not connected"
+                android:textColor="#FF5A5A" />
+
+            <Button
+                android:id="@+id/connectBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Connect" />
+        </LinearLayout>
+
+        <com.signaldeck.scope.ScopeView
+            android:id="@+id/scopeView"
+            android:layout_width="match_parent"
+            android:layout_height="240dp"
+            android:layout_marginBottom="12dp" />
+
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="3"
+            android:layout_marginBottom="12dp">
+
+            <TextView android:id="@+id/rTarget" android:layout_width="0dp" android:layout_columnWeight="1"
+                android:layout_height="wrap_content" android:text="Target: --" android:textColor="#4DFFA0" android:padding="6dp" />
+            <TextView android:id="@+id/rMeasured" android:layout_width="0dp" android:layout_columnWeight="1"
+                android:layout_height="wrap_content" android:text="Measured: --" android:textColor="#4DFFA0" android:padding="6dp" />
+            <TextView android:id="@+id/rDuty" android:layout_width="0dp" android:layout_columnWeight="1"
+                android:layout_height="wrap_content" android:text="Duty: --" android:textColor="#4DFFA0" android:padding="6dp" />
+        </GridLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <Button
+                android:id="@+id/captureBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Capture snapshot" />
+
+            <Button
+                android:id="@+id/liveBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Live view" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <EditText
+                android:id="@+id/cmdInput"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:hint="type command, e.g. D"
+                android:textColor="#BFE8CD"
+                android:textColorHint="#6F9A80"
+                android:inputType="text"
+                android:imeOptions="actionSend" />
+
+            <Button
+                android:id="@+id/sendBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Send" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/logView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="200dp"
+            android:background="#0D150E"
+            android:padding="10dp"
+            android:textColor="#4DFFA0"
+            android:fontFamily="monospace"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+</ScrollView>
