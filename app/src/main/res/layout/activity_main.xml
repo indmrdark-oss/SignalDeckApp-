@@ -53,8 +53,47 @@
         <com.signaldeck.scope.ScopeView
             android:id="@+id/scopeView"
             android:layout_width="match_parent"
-            android:layout_height="260dp"
-            android:layout_marginBottom="8dp" />
+            android:layout_height="280dp"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Pinch to zoom · drag to pan (captured mode only)"
+            android:textColor="#6F9A80"
+            android:textSize="9.5sp"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/zoomOutBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Zoom −"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/resetZoomBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Reset"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/zoomInBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Zoom +"
+                android:textSize="11sp" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/rVoltage"
@@ -62,7 +101,7 @@
             android:layout_height="wrap_content"
             android:text="Voltage: -- (no real capture yet)"
             android:textColor="#4DFFA0"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:textStyle="bold"
             android:layout_marginBottom="4dp" />
 
@@ -158,6 +197,29 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Send" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="LOG"
+                android:textColor="#6F9A80"
+                android:textSize="10.5sp" />
+
+            <Button
+                android:id="@+id/clearLogBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Clear Log"
+                android:textSize="11sp" />
         </LinearLayout>
 
         <TextView
