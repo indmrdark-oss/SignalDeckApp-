@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#050A06">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/backBtn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="← Back"
+            android:textColor="#4DFFA0"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Live"
+            android:textColor="#6F9A80"
+            android:textSize="12sp"
+            android:gravity="center" />
+
+        <Button android:id="@+id/fsZoomOutBtn" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="−" android:textSize="14sp" />
+        <Button android:id="@+id/fsResetBtn" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="Reset" android:textSize="12sp" />
+        <Button android:id="@+id/fsZoomInBtn" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:text="+" android:textSize="14sp" />
+    </LinearLayout>
+
+    <com.signaldeck.scope.ScopeView
+        android:id="@+id/fsScopeView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+</LinearLayout>
