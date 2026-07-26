@@ -17,10 +17,13 @@ import android.text.SpannableString
 import android.text.Spannable
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
+import android.view.Gravity
 import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.drawerlayout.widget.DrawerLayout
+import com.google.android.material.navigation.NavigationView
 
 class MainActivity : AppCompatActivity() {
 
@@ -28,6 +31,10 @@ class MainActivity : AppCompatActivity() {
     private var serial: UsbSerialManager? = null
     private var readThread: Thread? = null
     @Volatile private var keepReading = false
+
+    private lateinit var drawerLayout: DrawerLayout
+    private lateinit var navView: NavigationView
+    private lateinit var hamburgerBtn: TextView
 
     private lateinit var scopeView: ScopeView
     private lateinit var connStatus: TextView
@@ -121,6 +128,10 @@ class MainActivity : AppCompatActivity() {
 
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
 
+        drawerLayout = findViewById(R.id.drawerLayout)
+        navView = findViewById(R.id.navView)
+        hamburgerBtn = findViewById(R.id.hamburgerBtn)
+
         scopeView = findViewById(R.id.scopeView)
         connStatus = findViewById(R.id.connStatus)
         connectBtn = findViewById(R.id.connectBtn)
@@ -144,6 +155,23 @@ class MainActivity : AppCompatActivity() {
         zoomOutBtn = findViewById(R.id.zoomOutBtn)
         resetZoomBtn = findViewById(R.id.resetZoomBtn)
 
+        hamburgerBtn.setOnClickListener {
+            drawerLayout.openDrawer(Gravity.START)
+        }
+
+        navView.setNavigationItemSelectedListener { item ->
+            drawerLayout.closeDrawers()
+            when (item.itemId) {
+                R.id.menu_assistant -> startActivity(Intent(this, AssistantActivity::class.java))
+                R.id.menu_fullscreen -> startActivity(Intent(this, FullscreenScopeActivity::class.java))
+                R.id.menu_proscope -> startActivity(Intent(this, ProScopeActivity::class.java))
+            }
+            true
+        }
+
+        ScopeDataHub.sendCommand = { text -> serial?.writeLine(text) }
+        ScopeDataHub.toggleLiveCapture = { toggleLiveCapture() }
+
         val filter = IntentFilter().apply {
             addAction(ACTION_USB_PERMISSION)
             addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
@@ -163,24 +191,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        liveCaptureBtn.setOnClickListener {
-            if (liveCaptureActive) {
-                liveCaptureActive = false
-                liveCaptureBtn.text = "Start Live Capture"
-                appendLog("Live capture stopped.")
-            } else {
-                liveCaptureActive = true
-                liveCaptureBtn.text = "Stop Live Capture"
-                appendLog("Live capture started.")
-                uiHandler.post(liveCaptureLoop)
-            }
-        }
+        liveCaptureBtn.setOnClickListener { toggleLiveCapture() }
 
         reconBtn.setOnClickListener {
             liveCaptureActive = false
+            ScopeDataHub.liveCaptureActive = false
             liveCaptureBtn.text = "Start Live Capture"
             rVoltage.text = "Voltage: -- (no real capture yet)"
             scopeView.showReconstructed()
+            ScopeDataHub.mode = "reconstructed"
+            ScopeDataHub.fidelityLabel = "RECONSTRUCTED · LIVE"
         }
 
         speed025Btn.setOnClickListener { setSpeed(0.25) }
@@ -193,9 +213,7 @@ class MainActivity : AppCompatActivity() {
         zoomOutBtn.setOnClickListener { scopeView.zoomOut() }
         resetZoomBtn.setOnClickListener { scopeView.resetZoom() }
 
-        clearLogBtn.setOnClickListener {
-            logView.text = ""
-        }
+        clearLogBtn.setOnClickListener { logView.text = "" }
 
         sendBtn.setOnClickListener {
             val text = cmdInput.text.toString().trim()
@@ -204,6 +222,21 @@ class MainActivity : AppCompatActivity() {
                 serial?.writeLine(text)
                 cmdInput.setText("")
             }
+        }
+    }
+
+    private fun toggleLiveCapture() {
+        if (liveCaptureActive) {
+            liveCaptureActive = false
+            ScopeDataHub.liveCaptureActive = false
+            liveCaptureBtn.text = "Start Live Capture"
+            appendLog("Live capture stopped.")
+        } else {
+            liveCaptureActive = true
+            ScopeDataHub.liveCaptureActive = true
+            liveCaptureBtn.text = "Stop Live Capture"
+            appendLog("Live capture started.")
+            uiHandler.post(liveCaptureLoop)
         }
     }
 
@@ -245,6 +278,7 @@ class MainActivity : AppCompatActivity() {
             serial = mgr
             connStatus.text = "Connected · 250000 baud"
             connStatus.setTextColor(0xFF4DFFA0.toInt())
+            ScopeDataHub.connected = true
             startReadLoop()
         } catch (e: Exception) {
             appendLog("CRASH in connectToDevice: " + e.toString())
@@ -254,6 +288,8 @@ class MainActivity : AppCompatActivity() {
     private fun disconnect() {
         keepReading = false
         liveCaptureActive = false
+        ScopeDataHub.liveCaptureActive = false
+        ScopeDataHub.connected = false
         liveCaptureBtn.text = "Start Live Capture"
         readThread = null
         serial?.close()
@@ -330,6 +366,10 @@ class MainActivity : AppCompatActivity() {
         scopeView.liveFreq = if (lastWaveform) lastMeasuredHz else lastTargetHz
         scopeView.liveDuty = lastDuty
         scopeView.waveformPresent = lastWaveform
+
+        ScopeDataHub.liveFreq = scopeView.liveFreq
+        ScopeDataHub.liveDuty = lastDuty
+        ScopeDataHub.waveformPresent = lastWaveform
     }
 
     private fun onCaptureComplete() {
@@ -364,9 +404,14 @@ class MainActivity : AppCompatActivity() {
 
         if (spc >= 4) {
             scopeView.showCaptured(samples, label, capRate)
+            ScopeDataHub.mode = "captured"
         } else {
             scopeView.showReconstructed()
+            ScopeDataHub.mode = "reconstructed"
         }
+        ScopeDataHub.capturedSamples = samples
+        ScopeDataHub.capturedSampleRateHz = capRate
+        ScopeDataHub.fidelityLabel = label
     }
 
     private fun appendLog(line: String) {
