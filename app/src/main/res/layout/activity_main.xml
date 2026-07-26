@@ -1,237 +1,251 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.drawerlayout.widget.DrawerLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res/res-auto"
+    android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="#070B08">
+    android:layout_height="match_parent">
 
-    <LinearLayout
+    <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="16dp">
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="SIGNAL DECK"
-            android:textColor="#4DFFA0"
-            android:textSize="30sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="NATIVE USB SCOPE PANEL"
-            android:textColor="#6F9A80"
-            android:textSize="11sp"
-            android:layout_marginBottom="12dp" />
+        android:layout_height="match_parent"
+        android:background="#070B08">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="#0D150E"
-            android:padding="12dp"
-            android:layout_marginBottom="12dp"
-            android:gravity="center_vertical">
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:id="@+id/hamburgerBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="☰"
+                    android:textColor="#4DFFA0"
+                    android:textSize="26sp"
+                    android:padding="8dp" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="SIGNAL DECK"
+                    android:textColor="#4DFFA0"
+                    android:textSize="26sp"
+                    android:textStyle="bold"
+                    android:gravity="center" />
+
+                <View android:layout_width="42dp" android:layout_height="1dp" />
+            </LinearLayout>
 
             <TextView
-                android:id="@+id/connStatus"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Not connected"
-                android:textColor="#FF5A5A" />
-
-            <Button
-                android:id="@+id/connectBtn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Connect" />
-        </LinearLayout>
-
-        <com.signaldeck.scope.ScopeView
-            android:id="@+id/scopeView"
-            android:layout_width="match_parent"
-            android:layout_height="280dp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Pinch to zoom · drag to pan (captured mode only)"
-            android:textColor="#6F9A80"
-            android:textSize="9.5sp"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/zoomOutBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Zoom −"
-                android:textSize="11sp" />
-
-            <Button
-                android:id="@+id/resetZoomBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Reset"
-                android:textSize="11sp" />
-
-            <Button
-                android:id="@+id/zoomInBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Zoom +"
-                android:textSize="11sp" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/rVoltage"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Voltage: -- (no real capture yet)"
-            android:textColor="#4DFFA0"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:id="@+id/rRate"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Frame rate: --"
-            android:textColor="#6F9A80"
-            android:textSize="10.5sp"
-            android:layout_marginBottom="12dp" />
-
-        <GridLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:columnCount="3"
-            android:layout_marginBottom="12dp">
-
-            <TextView android:id="@+id/rTarget" android:layout_width="0dp" android:layout_columnWeight="1"
-                android:layout_height="wrap_content" android:text="Target: --" android:textColor="#4DFFA0" android:padding="6dp" />
-            <TextView android:id="@+id/rMeasured" android:layout_width="0dp" android:layout_columnWeight="1"
-                android:layout_height="wrap_content" android:text="Measured: --" android:textColor="#4DFFA0" android:padding="6dp" />
-            <TextView android:id="@+id/rDuty" android:layout_width="0dp" android:layout_columnWeight="1"
-                android:layout_height="wrap_content" android:text="Duty: --" android:textColor="#4DFFA0" android:padding="6dp" />
-        </GridLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/liveCaptureBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Start Live Capture" />
-
-            <Button
-                android:id="@+id/reconBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Reconstructed" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Live capture speed:"
-            android:textColor="#6F9A80"
-            android:textSize="10.5sp"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <Button android:id="@+id/speed025Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="0.25x" android:textSize="11sp" />
-            <Button android:id="@+id/speed05Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="0.5x" android:textSize="11sp" />
-            <Button android:id="@+id/speed1Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="1x" android:textSize="11sp" />
-            <Button android:id="@+id/speed2Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="2x" android:textSize="11sp" />
-            <Button android:id="@+id/speed4Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="4x" android:textSize="11sp" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <EditText
-                android:id="@+id/cmdInput"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:hint="type command, e.g. D"
-                android:textColor="#BFE8CD"
-                android:textColorHint="#6F9A80"
-                android:inputType="text"
-                android:imeOptions="actionSend" />
-
-            <Button
-                android:id="@+id/sendBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Send" />
-        </LinearLayout>
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="4dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="LOG"
+                android:text="NATIVE USB SCOPE PANEL"
                 android:textColor="#6F9A80"
-                android:textSize="10.5sp" />
+                android:textSize="11sp"
+                android:gravity="center"
+                android:layout_marginBottom="12dp" />
 
-            <Button
-                android:id="@+id/clearLogBtn"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="#0D150E"
+                android:padding="12dp"
+                android:layout_marginBottom="12dp"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/connStatus"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Not connected"
+                    android:textColor="#FF5A5A" />
+
+                <Button
+                    android:id="@+id/connectBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Connect" />
+            </LinearLayout>
+
+            <com.signaldeck.scope.ScopeView
+                android:id="@+id/scopeView"
+                android:layout_width="match_parent"
+                android:layout_height="280dp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Pinch to zoom · drag to pan (captured mode only)"
+                android:textColor="#6F9A80"
+                android:textSize="9.5sp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <Button android:id="@+id/zoomOutBtn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="Zoom −" android:textSize="11sp" />
+                <Button android:id="@+id/resetZoomBtn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="Reset" android:textSize="11sp" />
+                <Button android:id="@+id/zoomInBtn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="Zoom +" android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/rVoltage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Voltage: -- (no real capture yet)"
+                android:textColor="#4DFFA0"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/rRate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Frame rate: --"
+                android:textColor="#6F9A80"
+                android:textSize="10.5sp"
+                android:layout_marginBottom="12dp" />
+
+            <GridLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:columnCount="3"
+                android:layout_marginBottom="12dp">
+
+                <TextView android:id="@+id/rTarget" android:layout_width="0dp" android:layout_columnWeight="1"
+                    android:layout_height="wrap_content" android:text="Target: --" android:textColor="#4DFFA0" android:padding="6dp" />
+                <TextView android:id="@+id/rMeasured" android:layout_width="0dp" android:layout_columnWeight="1"
+                    android:layout_height="wrap_content" android:text="Measured: --" android:textColor="#4DFFA0" android:padding="6dp" />
+                <TextView android:id="@+id/rDuty" android:layout_width="0dp" android:layout_columnWeight="1"
+                    android:layout_height="wrap_content" android:text="Duty: --" android:textColor="#4DFFA0" android:padding="6dp" />
+            </GridLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <Button android:id="@+id/liveCaptureBtn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="Start Live Capture" />
+                <Button android:id="@+id/reconBtn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="Reconstructed" />
+            </LinearLayout>
+
+            <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Clear Log"
+                android:text="Live capture speed:"
+                android:textColor="#6F9A80"
+                android:textSize="10.5sp"
+                android:layout_marginBottom="4dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <Button android:id="@+id/speed025Btn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="0.25x" android:textSize="11sp" />
+                <Button android:id="@+id/speed05Btn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="0.5x" android:textSize="11sp" />
+                <Button android:id="@+id/speed1Btn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="1x" android:textSize="11sp" />
+                <Button android:id="@+id/speed2Btn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="2x" android:textSize="11sp" />
+                <Button android:id="@+id/speed4Btn" android:layout_width="0dp" android:layout_weight="1"
+                    android:layout_height="wrap_content" android:text="4x" android:textSize="11sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="12dp">
+
+                <EditText
+                    android:id="@+id/cmdInput"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:hint="type command, e.g. D"
+                    android:textColor="#BFE8CD"
+                    android:textColorHint="#6F9A80"
+                    android:inputType="text"
+                    android:imeOptions="actionSend" />
+
+                <Button
+                    android:id="@+id/sendBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Send" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="LOG"
+                    android:textColor="#6F9A80"
+                    android:textSize="10.5sp" />
+
+                <Button
+                    android:id="@+id/clearLogBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Clear Log"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/logView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="200dp"
+                android:background="#0D150E"
+                android:padding="10dp"
+                android:textColor="#4DFFA0"
+                android:fontFamily="monospace"
                 android:textSize="11sp" />
+
         </LinearLayout>
+    </ScrollView>
 
-        <TextView
-            android:id="@+id/logView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="200dp"
-            android:background="#0D150E"
-            android:padding="10dp"
-            android:textColor="#4DFFA0"
-            android:fontFamily="monospace"
-            android:textSize="11sp" />
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/navView"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_gravity="start"
+        android:background="#0D150E"
+        app:itemTextColor="#4DFFA0"
+        app:itemIconTint="#4DFFA0"
+        app:menu="@menu/drawer_menu" />
 
-    </LinearLayout>
-</ScrollView>
+</androidx.drawerlayout.widget.DrawerLayout>
