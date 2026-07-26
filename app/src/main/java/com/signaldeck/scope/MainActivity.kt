@@ -71,10 +71,15 @@ class MainActivity : AppCompatActivity() {
     private var lastFrameArrivedMs = 0L
     private val baseIntervalMs = 400L
 
+    // Tracks whether the Arduino is mid-way through an M or D entry, waiting
+    // for the NEXT line to be the actual value. While true, we must NOT let
+    // the live-capture loop's automatic "C" sneak in as that value.
+    private var pendingArduinoEntry = false
+
     private val liveCaptureLoop = object : Runnable {
         override fun run() {
             if (!liveCaptureActive) return
-            if (!capturing) {
+            if (!capturing && !pendingArduinoEntry) {
                 serial?.writeLine("C")
             }
             val interval = (baseIntervalMs / speedMultiplier).toLong().coerceAtLeast(60L)
@@ -199,6 +204,19 @@ class MainActivity : AppCompatActivity() {
             val text = cmdInput.text.toString().trim()
             if (text.isNotEmpty()) {
                 appendCommandLog(text)
+
+                val upper = text.uppercase()
+                if (upper == "D" || upper == "M") {
+                    // We're about to enter a two-step exchange with the Arduino -
+                    // block the live-capture loop's automatic "C" until the
+                    // follow-up value has been sent.
+                    pendingArduinoEntry = true
+                } else if (pendingArduinoEntry) {
+                    // This message IS the follow-up value - send it, then
+                    // resume normal live-capture C sends afterward.
+                    pendingArduinoEntry = false
+                }
+
                 serial?.writeLine(text)
                 cmdInput.setText("")
             }
@@ -252,6 +270,7 @@ class MainActivity : AppCompatActivity() {
     private fun disconnect() {
         keepReading = false
         liveCaptureActive = false
+        pendingArduinoEntry = false
         liveCaptureBtn.text = "Start Live Capture"
         readThread = null
         serial?.close()
