@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cmdInput: EditText
     private lateinit var sendBtn: Button
     private lateinit var logView: TextView
+    private lateinit var clearLogBtn: Button
     private lateinit var rTarget: TextView
     private lateinit var rMeasured: TextView
     private lateinit var rDuty: TextView
@@ -47,6 +48,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var speed1Btn: Button
     private lateinit var speed2Btn: Button
     private lateinit var speed4Btn: Button
+    private lateinit var zoomInBtn: Button
+    private lateinit var zoomOutBtn: Button
+    private lateinit var resetZoomBtn: Button
 
     private val ACTION_USB_PERMISSION = "com.signaldeck.scope.USB_PERMISSION"
 
@@ -125,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         cmdInput = findViewById(R.id.cmdInput)
         sendBtn = findViewById(R.id.sendBtn)
         logView = findViewById(R.id.logView)
+        clearLogBtn = findViewById(R.id.clearLogBtn)
         rTarget = findViewById(R.id.rTarget)
         rMeasured = findViewById(R.id.rMeasured)
         rDuty = findViewById(R.id.rDuty)
@@ -135,6 +140,9 @@ class MainActivity : AppCompatActivity() {
         speed1Btn = findViewById(R.id.speed1Btn)
         speed2Btn = findViewById(R.id.speed2Btn)
         speed4Btn = findViewById(R.id.speed4Btn)
+        zoomInBtn = findViewById(R.id.zoomInBtn)
+        zoomOutBtn = findViewById(R.id.zoomOutBtn)
+        resetZoomBtn = findViewById(R.id.resetZoomBtn)
 
         val filter = IntentFilter().apply {
             addAction(ACTION_USB_PERMISSION)
@@ -180,6 +188,14 @@ class MainActivity : AppCompatActivity() {
         speed1Btn.setOnClickListener { setSpeed(1.0) }
         speed2Btn.setOnClickListener { setSpeed(2.0) }
         speed4Btn.setOnClickListener { setSpeed(4.0) }
+
+        zoomInBtn.setOnClickListener { scopeView.zoomIn() }
+        zoomOutBtn.setOnClickListener { scopeView.zoomOut() }
+        resetZoomBtn.setOnClickListener { scopeView.resetZoom() }
+
+        clearLogBtn.setOnClickListener {
+            logView.text = ""
+        }
 
         sendBtn.setOnClickListener {
             val text = cmdInput.text.toString().trim()
