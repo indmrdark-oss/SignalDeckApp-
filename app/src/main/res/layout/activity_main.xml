@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#070B08">
@@ -10,6 +11,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="16dp">
+
+        <!-- ================================================= -->
+        <!-- HEADER -->
+        <!-- ================================================= -->
 
         <TextView
             android:layout_width="wrap_content"
@@ -26,6 +31,10 @@
             android:textColor="#6F9A80"
             android:textSize="11sp"
             android:layout_marginBottom="12dp" />
+
+        <!-- ================================================= -->
+        <!-- CONNECTION -->
+        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -52,6 +61,10 @@
 
         </LinearLayout>
 
+        <!-- ================================================= -->
+        <!-- SCOPE -->
+        <!-- ================================================= -->
+
         <com.signaldeck.scope.ScopeView
             android:id="@+id/scopeView"
             android:layout_width="match_parent"
@@ -68,7 +81,9 @@
             android:textStyle="bold"
             android:layout_marginBottom="12dp" />
 
+        <!-- ================================================= -->
         <!-- FREQUENCY CONTROL -->
+        <!-- ================================================= -->
 
         <TextView
             android:layout_width="wrap_content"
@@ -90,6 +105,10 @@
             android:gravity="center"
             android:layout_marginBottom="8dp" />
 
+        <!-- ================================================= -->
+        <!-- DIAL -->
+        <!-- ================================================= -->
+
         <com.signaldeck.scope.DialView
             android:id="@+id/dialView"
             android:layout_width="220dp"
@@ -97,7 +116,76 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="10dp" />
 
+        <!-- ================================================= -->
+        <!-- UP / DOWN HOLD BUTTONS -->
+        <!-- ================================================= -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/downFreqBtn"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="▼"
+                android:textSize="26sp" />
+
+            <Button
+                android:id="@+id/upFreqBtn"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:text="▲"
+                android:textSize="26sp" />
+
+        </LinearLayout>
+
+        <!-- ================================================= -->
+        <!-- ARROW SPEED -->
+        <!-- ================================================= -->
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="ARROW SPEED"
+            android:textColor="#6F9A80"
+            android:textSize="10.5sp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="4dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="10dp">
+
+            <Button
+                android:id="@+id/speed1xBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="1×"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/speed2xBtn"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="2×"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+        <!-- ================================================= -->
         <!-- COARSE / FINE -->
+        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -123,44 +211,9 @@
 
         </LinearLayout>
 
-        <!-- HOLD ARROW CONTROLS -->
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/downFreqBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="▼"
-                android:textSize="24sp"
-                android:longClickable="false" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text=" HOLD TO CHANGE "
-                android:textColor="#6F9A80"
-                android:textSize="10sp"
-                android:gravity="center" />
-
-            <Button
-                android:id="@+id/upFreqBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="▲"
-                android:textSize="24sp"
-                android:longClickable="false" />
-
-        </LinearLayout>
-
+        <!-- ================================================= -->
         <!-- EXACT NUDGE BUTTONS -->
+        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -202,7 +255,9 @@
 
         </LinearLayout>
 
-        <!-- END FREQUENCY CONTROL -->
+        <!-- ================================================= -->
+        <!-- STATUS -->
+        <!-- ================================================= -->
 
         <TextView
             android:id="@+id/rRate"
@@ -248,6 +303,10 @@
 
         </GridLayout>
 
+        <!-- ================================================= -->
+        <!-- CAPTURE -->
+        <!-- ================================================= -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -269,6 +328,10 @@
                 android:text="Reconstructed" />
 
         </LinearLayout>
+
+        <!-- ================================================= -->
+        <!-- COMMAND -->
+        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -294,6 +357,10 @@
                 android:text="Send" />
 
         </LinearLayout>
+
+        <!-- ================================================= -->
+        <!-- LOG -->
+        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
