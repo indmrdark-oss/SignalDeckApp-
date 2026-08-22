@@ -17,22 +17,27 @@ class DialView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
+    // Old rotation callback
     var onRotate: ((Double) -> Unit)? = null
+
+    // NEW: absolute frequency callback
+    var onFrequencySelected: ((Double) -> Unit)? = null
 
     var currentFrequency: Double = 1000.0
         set(value) {
-            field = value.coerceIn(minFrequency, maxFrequency)
+            field = value.coerceIn(
+                minFrequency,
+                maxFrequency
+            )
             invalidate()
         }
 
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val paint =
+        Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val minFrequency = 1.0
     private val maxFrequency = 20000.0
 
-    // Dial travel:
-    // -135° = minimum
-    // +135° = maximum
     private val startAngle = -135.0
     private val sweepAngle = 270.0
 
@@ -44,10 +49,12 @@ class DialView @JvmOverloads constructor(
 
         val cx = width / 2f
         val cy = height / 2f
-        val radius = min(width, height) * 0.38f
+
+        val radius =
+            min(width, height) * 0.38f
 
         // =====================================================
-        // DIAL BODY
+        // BODY
         // =====================================================
 
         paint.style = Paint.Style.FILL
@@ -86,7 +93,8 @@ class DialView @JvmOverloads constructor(
 
             val angle =
                 startAngle +
-                        sweepAngle * (i / 20.0)
+                        sweepAngle *
+                        (i / 20.0)
 
             val rad =
                 Math.toRadians(angle)
@@ -102,16 +110,28 @@ class DialView @JvmOverloads constructor(
                 }
 
             canvas.drawLine(
-                cx + cos(rad).toFloat() * inner,
-                cy + sin(rad).toFloat() * inner,
-                cx + cos(rad).toFloat() * outer,
-                cy + sin(rad).toFloat() * outer,
+                cx +
+                        cos(rad).toFloat() *
+                        inner,
+
+                cy +
+                        sin(rad).toFloat() *
+                        inner,
+
+                cx +
+                        cos(rad).toFloat() *
+                        outer,
+
+                cy +
+                        sin(rad).toFloat() *
+                        outer,
+
                 paint
             )
         }
 
         // =====================================================
-        // 1 Hz REFERENCE
+        // 1 Hz MARK
         // =====================================================
 
         val refRad =
@@ -121,15 +141,27 @@ class DialView @JvmOverloads constructor(
         paint.color = 0xFFFFFFFF.toInt()
 
         canvas.drawLine(
-            cx + cos(refRad).toFloat() * radius * 0.72f,
-            cy + sin(refRad).toFloat() * radius * 0.72f,
-            cx + cos(refRad).toFloat() * radius * 0.90f,
-            cy + sin(refRad).toFloat() * radius * 0.90f,
+            cx +
+                    cos(refRad).toFloat() *
+                    radius * 0.72f,
+
+            cy +
+                    sin(refRad).toFloat() *
+                    radius * 0.72f,
+
+            cx +
+                    cos(refRad).toFloat() *
+                    radius * 0.90f,
+
+            cy +
+                    sin(refRad).toFloat() *
+                    radius * 0.90f,
+
             paint
         )
 
         // =====================================================
-        // 1 Hz LABEL
+        // 1 Hz TEXT
         // =====================================================
 
         paint.style = Paint.Style.FILL
@@ -140,29 +172,41 @@ class DialView @JvmOverloads constructor(
 
         canvas.drawText(
             "1 Hz",
-            cx + cos(refRad).toFloat() * radius * 0.58f,
-            cy + sin(refRad).toFloat() * radius * 0.58f,
+
+            cx +
+                    cos(refRad).toFloat() *
+                    radius * 0.58f,
+
+            cy +
+                    sin(refRad).toFloat() *
+                    radius * 0.58f,
+
             paint
         )
 
         // =====================================================
-        // NEEDLE POSITION
+        // NEEDLE
         // =====================================================
 
         val normalized =
             (
-                currentFrequency - minFrequency
+                currentFrequency -
+                        minFrequency
             ) /
                     (
-                        maxFrequency - minFrequency
+                        maxFrequency -
+                                minFrequency
                     )
 
         val needleAngle =
             startAngle +
-                    normalized * sweepAngle
+                    normalized *
+                    sweepAngle
 
         val needleRad =
-            Math.toRadians(needleAngle)
+            Math.toRadians(
+                needleAngle
+            )
 
         val needleLength =
             radius * 0.68f
@@ -176,10 +220,6 @@ class DialView @JvmOverloads constructor(
             cy +
                     sin(needleRad).toFloat() *
                     needleLength
-
-        // =====================================================
-        // NEEDLE
-        // =====================================================
 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 8f
@@ -227,21 +267,14 @@ class DialView @JvmOverloads constructor(
 
         when (event.actionMasked) {
 
-            // =================================================
-            // TOUCH
-            // =================================================
-
             MotionEvent.ACTION_DOWN -> {
 
                 touching = true
 
-                // Don't let the parent ScrollView
-                // steal our touch.
                 parent?.requestDisallowInterceptTouchEvent(
                     true
                 )
 
-                // INSTANTLY MOVE TO FINGER POSITION
                 setFrequencyFromTouch(
                     event.x,
                     event.y,
@@ -253,10 +286,6 @@ class DialView @JvmOverloads constructor(
 
                 return true
             }
-
-            // =================================================
-            // DRAG
-            // =================================================
 
             MotionEvent.ACTION_MOVE -> {
 
@@ -274,10 +303,6 @@ class DialView @JvmOverloads constructor(
                 return true
             }
 
-            // =================================================
-            // RELEASE
-            // =================================================
-
             MotionEvent.ACTION_UP -> {
 
                 touching = false
@@ -290,10 +315,6 @@ class DialView @JvmOverloads constructor(
 
                 return true
             }
-
-            // =================================================
-            // CANCEL
-            // =================================================
 
             MotionEvent.ACTION_CANCEL -> {
 
@@ -310,12 +331,6 @@ class DialView @JvmOverloads constructor(
         return true
     }
 
-    /**
-     * Converts the finger's position directly into frequency.
-     *
-     * -135° -> 1 Hz
-     * +135° -> 20,000 Hz
-     */
     private fun setFrequencyFromTouch(
         x: Float,
         y: Float,
@@ -323,7 +338,7 @@ class DialView @JvmOverloads constructor(
         cy: Float
     ) {
 
-        var angle =
+        val angle =
             Math.toDegrees(
                 atan2(
                     (y - cy).toDouble(),
@@ -331,7 +346,6 @@ class DialView @JvmOverloads constructor(
                 )
             )
 
-        // Convert angle into the dial's 0..270° range.
         var relative =
             angle - startAngle
 
@@ -343,8 +357,7 @@ class DialView @JvmOverloads constructor(
             relative -= 360.0
         }
 
-        // Ignore the large unused 90° section
-        // behind the dial.
+        // Outside the active 270° dial area.
         if (relative > sweepAngle) {
             return
         }
@@ -365,15 +378,14 @@ class DialView @JvmOverloads constructor(
                                 minFrequency
                     )
 
-        // Send the new absolute frequency
-        // to MainActivity.
-        onRotate?.invoke(
-            frequency - currentFrequency
+        // THIS IS THE IMPORTANT PART:
+        // Send ABSOLUTE frequency directly.
+        onFrequencySelected?.invoke(
+            frequency
         )
 
+        // Keep visual dial immediately responsive.
         currentFrequency = frequency
-
-        invalidate()
     }
 
     override fun performClick(): Boolean {
