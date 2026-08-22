@@ -22,7 +22,6 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -30,7 +29,8 @@ class MainActivity : AppCompatActivity() {
     private var serial: UsbSerialManager? = null
 
     private var readThread: Thread? = null
-    @Volatile private var keepReading = false
+    @Volatile
+    private var keepReading = false
 
     private lateinit var scopeView: ScopeView
     private lateinit var dialView: DialView
@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
     private var capRate = 0.0
     private var capSamples: IntArray? = null
 
-    private var lineBuffer = StringBuilder()
+    private val lineBuffer = StringBuilder()
 
     private var lastMeasuredHz = 0.0
     private var lastDuty = 50.0
@@ -82,7 +82,7 @@ class MainActivity : AppCompatActivity() {
     private var lastFrameArrivedMs = 0L
 
     // =========================================================
-    // FREQUENCY DIAL
+    // FREQUENCY CONTROL
     // =========================================================
 
     private var dialFrequency = 1000.0
@@ -94,6 +94,7 @@ class MainActivity : AppCompatActivity() {
         3000.0 / 360.0
 
     private var pendingSend = false
+
     private val sendThrottleMs = 60L
 
     // =========================================================
@@ -103,23 +104,37 @@ class MainActivity : AppCompatActivity() {
     private var freqRepeatDirection = 0
 
     /*
-     * Hold arrow:
+     * Hold ↑ or ↓:
      *
      * First change happens immediately.
-     * Then wait 300 ms.
-     * Then change by 1 Hz every 100 ms.
+     * Then waits 300 ms.
+     * Then changes every 100 ms.
      *
-     * = about 10 Hz/second.
+     * That's about 10 Hz/second.
      */
     private val freqRepeatRunnable =
         object : Runnable {
 
             override fun run() {
 
-                if (freqRepeatDirection == 0)
+                if (freqRepeatDirection == 0) {
                     return
+                }
 
-                changeFrequency(1.0 * freqRepeatDirection)
+                dialFrequency =
+                    (
+                        dialFrequency +
+                            freqRepeatDirection * 1.0
+                    ).coerceIn(
+                        F_MIN,
+                        F_MAX
+                    )
+
+                updateDialDisplay()
+
+                serial?.writeLine(
+                    "F%.2f".format(dialFrequency)
+                )
 
                 uiHandler.postDelayed(
                     this,
@@ -137,11 +152,13 @@ class MainActivity : AppCompatActivity() {
 
             override fun run() {
 
-                if (!liveCaptureActive)
+                if (!liveCaptureActive) {
                     return
+                }
 
-                if (!capturing)
+                if (!capturing) {
                     serial?.writeLine("C")
+                }
 
                 uiHandler.postDelayed(
                     this,
@@ -161,7 +178,11 @@ class MainActivity : AppCompatActivity() {
 
                 if (pendingSend) {
 
-                    sendFrequency()
+                    serial?.writeLine(
+                        "F%.2f".format(
+                            dialFrequency
+                        )
+                    )
 
                     pendingSend = false
                 }
@@ -191,43 +212,40 @@ class MainActivity : AppCompatActivity() {
 
                         ACTION_USB_PERMISSION -> {
 
-                            synchronized(this) {
+                            val device: UsbDevice? =
+                                if (Build.VERSION.SDK_INT >= 33) {
 
-                                val device: UsbDevice? =
-                                    if (Build.VERSION.SDK_INT >= 33) {
-
-                                        intent.getParcelableExtra(
-                                            UsbManager.EXTRA_DEVICE,
-                                            UsbDevice::class.java
-                                        )
-
-                                    } else {
-
-                                        @Suppress("DEPRECATION")
-                                        intent.getParcelableExtra(
-                                            UsbManager.EXTRA_DEVICE
-                                        )
-                                    }
-
-                                val granted =
-                                    intent.getBooleanExtra(
-                                        UsbManager.EXTRA_PERMISSION_GRANTED,
-                                        false
+                                    intent.getParcelableExtra(
+                                        UsbManager.EXTRA_DEVICE,
+                                        UsbDevice::class.java
                                     )
-
-                                if (
-                                    granted &&
-                                    device != null
-                                ) {
-
-                                    connectToDevice(device)
 
                                 } else {
 
-                                    appendLog(
-                                        "Permission denied for USB device."
+                                    @Suppress("DEPRECATION")
+                                    intent.getParcelableExtra(
+                                        UsbManager.EXTRA_DEVICE
                                     )
                                 }
+
+                            val granted =
+                                intent.getBooleanExtra(
+                                    UsbManager.EXTRA_USB_PERMISSION,
+                                    false
+                                )
+
+                            if (
+                                granted &&
+                                device != null
+                            ) {
+
+                                connectToDevice(device)
+
+                            } else {
+
+                                appendLog(
+                                    "Permission denied for USB device."
+                                )
                             }
                         }
 
@@ -251,7 +269,8 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
 
                     appendLog(
-                        "CRASH in usbReceiver: ${e}"
+                        "CRASH in usbReceiver: " +
+                            e.toString()
                     )
                 }
             }
@@ -275,6 +294,10 @@ class MainActivity : AppCompatActivity() {
             getSystemService(
                 Context.USB_SERVICE
             ) as UsbManager
+
+        // -----------------------------------------------------
+        // FIND VIEWS
+        // -----------------------------------------------------
 
         scopeView =
             findViewById(R.id.scopeView)
@@ -348,9 +371,9 @@ class MainActivity : AppCompatActivity() {
         upFreqBtn =
             findViewById(R.id.upFreqBtn)
 
-        // =====================================================
+        // -----------------------------------------------------
         // USB BROADCAST
-        // =====================================================
+        // -----------------------------------------------------
 
         val filter =
             IntentFilter().apply {
@@ -387,9 +410,9 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // CONNECT
-        // =====================================================
+        // -----------------------------------------------------
 
         connectBtn.setOnClickListener {
 
@@ -404,14 +427,15 @@ class MainActivity : AppCompatActivity() {
             } catch (e: Exception) {
 
                 appendLog(
-                    "CRASH on Connect tap: $e"
+                    "CRASH on Connect tap: " +
+                        e.toString()
                 )
             }
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // LIVE CAPTURE
-        // =====================================================
+        // -----------------------------------------------------
 
         liveCaptureBtn.setOnClickListener {
 
@@ -443,9 +467,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // RECONSTRUCTED
-        // =====================================================
+        // -----------------------------------------------------
 
         reconBtn.setOnClickListener {
 
@@ -460,22 +484,24 @@ class MainActivity : AppCompatActivity() {
             scopeView.showReconstructed()
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // CLEAR LOG
-        // =====================================================
+        // -----------------------------------------------------
 
         clearLogBtn.setOnClickListener {
             logView.text = ""
         }
 
-        // =====================================================
+        // -----------------------------------------------------
         // MANUAL COMMAND
-        // =====================================================
+        // -----------------------------------------------------
 
         sendBtn.setOnClickListener {
 
             val text =
-                cmdInput.text.toString().trim()
+                cmdInput.text
+                    .toString()
+                    .trim()
 
             if (text.isNotEmpty()) {
 
@@ -511,9 +537,9 @@ class MainActivity : AppCompatActivity() {
                 pendingSend = true
             }
 
-        // =====================================================
-        // COARSE MODE
-        // =====================================================
+        // -----------------------------------------------------
+        // COARSE
+        // -----------------------------------------------------
 
         coarseModeBtn.setOnClickListener {
 
@@ -521,13 +547,14 @@ class MainActivity : AppCompatActivity() {
                 3000.0 / 360.0
 
             appendLog(
-                "Dial: COARSE mode — 1 rotation ≈ 3000 Hz"
+                "Dial: COARSE mode " +
+                    "(1 turn ≈ 3000 Hz)"
             )
         }
 
-        // =====================================================
-        // FINE MODE
-        // =====================================================
+        // -----------------------------------------------------
+        // FINE
+        // -----------------------------------------------------
 
         fineModeBtn.setOnClickListener {
 
@@ -535,12 +562,13 @@ class MainActivity : AppCompatActivity() {
                 60.0 / 360.0
 
             appendLog(
-                "Dial: FINE mode — 1 rotation ≈ 60 Hz"
+                "Dial: FINE mode " +
+                    "(1 turn ≈ 60 Hz)"
             )
         }
 
         // =====================================================
-        // DOWN ARROW — HOLD
+        // HOLD DOWN ARROW
         // =====================================================
 
         downFreqBtn.setOnTouchListener {
@@ -552,8 +580,9 @@ class MainActivity : AppCompatActivity() {
 
                     freqRepeatDirection = -1
 
-                    // Immediate first step
-                    changeFrequency(-1.0)
+                    changeFrequencyBy(
+                        -1.0
+                    )
 
                     startFrequencyRepeat()
 
@@ -573,7 +602,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // UP ARROW — HOLD
+        // HOLD UP ARROW
         // =====================================================
 
         upFreqBtn.setOnTouchListener {
@@ -585,8 +614,9 @@ class MainActivity : AppCompatActivity() {
 
                     freqRepeatDirection = 1
 
-                    // Immediate first step
-                    changeFrequency(1.0)
+                    changeFrequencyBy(
+                        1.0
+                    )
 
                     startFrequencyRepeat()
 
@@ -606,28 +636,28 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // EXACT NUDGE BUTTONS
+        // OLD EXACT NUDGE BUTTONS
         // =====================================================
 
         minus1Btn.setOnClickListener {
-            changeFrequency(-1.0)
+            nudgeFrequency(-1.0)
         }
 
         minus01Btn.setOnClickListener {
-            changeFrequency(-0.1)
+            nudgeFrequency(-0.1)
         }
 
         plus01Btn.setOnClickListener {
-            changeFrequency(0.1)
+            nudgeFrequency(0.1)
         }
 
         plus1Btn.setOnClickListener {
-            changeFrequency(1.0)
+            nudgeFrequency(1.0)
         }
 
-        // =====================================================
-        // INITIALIZE
-        // =====================================================
+        // -----------------------------------------------------
+        // INITIAL DISPLAY
+        // -----------------------------------------------------
 
         updateDialDisplay()
 
@@ -640,13 +670,13 @@ class MainActivity : AppCompatActivity() {
     // FREQUENCY CHANGE
     // =========================================================
 
-    private fun changeFrequency(
-        delta: Double
+    private fun changeFrequencyBy(
+        deltaHz: Double
     ) {
 
         dialFrequency =
             (
-                dialFrequency + delta
+                dialFrequency + deltaHz
             ).coerceIn(
                 F_MIN,
                 F_MAX
@@ -654,27 +684,15 @@ class MainActivity : AppCompatActivity() {
 
         updateDialDisplay()
 
-        sendFrequency()
-    }
-
-    // =========================================================
-    // SEND FREQUENCY TO ARDUINO
-    // =========================================================
-
-    private fun sendFrequency() {
-
-        val command =
-            String.format(
-                Locale.US,
-                "F%.2f",
+        serial?.writeLine(
+            "F%.2f".format(
                 dialFrequency
             )
-
-        serial?.writeLine(command)
+        )
     }
 
     // =========================================================
-    // START ARROW REPEAT
+    // START REPEAT
     // =========================================================
 
     private fun startFrequencyRepeat() {
@@ -684,8 +702,8 @@ class MainActivity : AppCompatActivity() {
         )
 
         /*
-         * 300 ms delay before repeating.
-         * This prevents accidental rapid jumps.
+         * Wait 300 ms after the first step.
+         * Then repeat every 100 ms.
          */
         uiHandler.postDelayed(
             freqRepeatRunnable,
@@ -694,7 +712,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // STOP ARROW REPEAT
+    // STOP REPEAT
     // =========================================================
 
     private fun stopFrequencyRepeat() {
@@ -707,22 +725,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // DIAL DISPLAY
+    // NUDGE BUTTON
+    // =========================================================
+
+    private fun nudgeFrequency(
+        deltaHz: Double
+    ) {
+
+        changeFrequencyBy(
+            deltaHz
+        )
+    }
+
+    // =========================================================
+    // DISPLAY
     // =========================================================
 
     private fun updateDialDisplay() {
 
         rTargetBig.text =
-            String.format(
-                Locale.US,
-                "%.2f Hz",
-                dialFrequency
-            )
-
-        rTarget.text =
-            String.format(
-                Locale.US,
-                "Target: %.2f Hz",
+            "%.2f Hz".format(
                 dialFrequency
             )
     }
@@ -740,7 +762,8 @@ class MainActivity : AppCompatActivity() {
 
             appendLog(
                 "No USB device found. " +
-                    "Check the cable and that Arduino is plugged in."
+                    "Check the cable and that " +
+                    "the Arduino is plugged in."
             )
 
             return
@@ -749,17 +772,21 @@ class MainActivity : AppCompatActivity() {
         val device =
             devices.first()
 
-        /*
-         * Explicitly construct Intent with a String.
-         * This avoids the Kotlin overload ambiguity.
-         */
         val usbPermissionIntent =
-            Intent(ACTION_USB_PERMISSION).apply {
-                setPackage(packageName)
+            Intent(
+                ACTION_USB_PERMISSION
+            ).apply {
+
+                setPackage(
+                    packageName
+                )
             }
 
         val flags =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (
+                Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.S
+            ) {
                 PendingIntent.FLAG_MUTABLE
             } else {
                 0
@@ -770,24 +797,3 @@ class MainActivity : AppCompatActivity() {
                 this,
                 0,
                 usbPermissionIntent,
-                flags
-            )
-
-        if (
-            usbManager.hasPermission(device)
-        ) {
-
-            connectToDevice(device)
-
-        } else {
-
-            usbManager.requestPermission(
-                device,
-                permissionIntent
-            )
-        }
-    }
-
-    // =========================================================
-    // CONNECT TO ARDUINO
-    // =============
