@@ -53,47 +53,8 @@
         <com.signaldeck.scope.ScopeView
             android:id="@+id/scopeView"
             android:layout_width="match_parent"
-            android:layout_height="280dp"
-            android:layout_marginBottom="4dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Pinch to zoom · drag to pan (captured mode only)"
-            android:textColor="#6F9A80"
-            android:textSize="9.5sp"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
-
-            <Button
-                android:id="@+id/zoomOutBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Zoom −"
-                android:textSize="11sp" />
-
-            <Button
-                android:id="@+id/resetZoomBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Reset"
-                android:textSize="11sp" />
-
-            <Button
-                android:id="@+id/zoomInBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Zoom +"
-                android:textSize="11sp" />
-        </LinearLayout>
+            android:layout_height="240dp"
+            android:layout_marginBottom="12dp" />
 
         <TextView
             android:id="@+id/rVoltage"
@@ -103,7 +64,64 @@
             android:textColor="#4DFFA0"
             android:textSize="14sp"
             android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <!-- ===== FREQUENCY DIAL SECTION ===== -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="FREQUENCY CONTROL"
+            android:textColor="#6F9A80"
+            android:textSize="10.5sp"
+            android:layout_gravity="center_horizontal"
             android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/rTargetBig"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1000.00 Hz"
+            android:textColor="#4DFFA0"
+            android:textSize="26sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="8dp" />
+
+        <com.signaldeck.scope.DialView
+            android:id="@+id/dialView"
+            android:layout_width="220dp"
+            android:layout_height="220dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="10dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button android:id="@+id/coarseModeBtn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Coarse" android:textSize="12sp" />
+            <Button android:id="@+id/fineModeBtn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Fine" android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+
+            <Button android:id="@+id/minus1Btn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="−1 Hz" android:textSize="12sp" />
+            <Button android:id="@+id/minus01Btn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="−0.1 Hz" android:textSize="11sp" />
+            <Button android:id="@+id/plus01Btn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="+0.1 Hz" android:textSize="11sp" />
+            <Button android:id="@+id/plus1Btn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="+1 Hz" android:textSize="12sp" />
+        </LinearLayout>
+        <!-- ===== END DIAL SECTION ===== -->
 
         <TextView
             android:id="@+id/rRate"
@@ -134,45 +152,10 @@
             android:orientation="horizontal"
             android:layout_marginBottom="8dp">
 
-            <Button
-                android:id="@+id/liveCaptureBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Start Live Capture" />
-
-            <Button
-                android:id="@+id/reconBtn"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Reconstructed" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Live capture speed:"
-            android:textColor="#6F9A80"
-            android:textSize="10.5sp"
-            android:layout_marginBottom="4dp" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
-
-            <Button android:id="@+id/speed025Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="0.25x" android:textSize="11sp" />
-            <Button android:id="@+id/speed05Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="0.5x" android:textSize="11sp" />
-            <Button android:id="@+id/speed1Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="1x" android:textSize="11sp" />
-            <Button android:id="@+id/speed2Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="2x" android:textSize="11sp" />
-            <Button android:id="@+id/speed4Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="4x" android:textSize="11sp" />
+            <Button android:id="@+id/liveCaptureBtn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Start Live Capture" />
+            <Button android:id="@+id/reconBtn" android:layout_width="0dp" android:layout_weight="1"
+                android:layout_height="wrap_content" android:text="Reconstructed" />
         </LinearLayout>
 
         <LinearLayout
