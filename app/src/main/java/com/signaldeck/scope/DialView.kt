@@ -20,9 +20,12 @@ class DialView @JvmOverloads constructor(
     var onRotate: ((Double) -> Unit)? = null
 
     var currentFrequency: Double = 1000.0
+        set(value) {
+            field = value.coerceIn(minFrequency, maxFrequency)
+            invalidate()
+        }
 
-    private val paint =
-        Paint(Paint.ANTI_ALIAS_FLAG)
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private var lastAngle = 0.0
     private var touching = false
@@ -30,17 +33,24 @@ class DialView @JvmOverloads constructor(
     private val minFrequency = 1.0
     private val maxFrequency = 20000.0
 
-    override fun onDraw(
-        canvas: Canvas
-    ) {
+    // Prevent tiny finger noise from making the dial jitter.
+    private var accumulatedDegrees = 0.0
+
+    // Minimum angular movement before sending a frequency update.
+    private val angleThreshold = 0.15
+
+    override fun onDraw(canvas: Canvas) {
 
         super.onDraw(canvas)
 
         val cx = width / 2f
         val cy = height / 2f
 
-        val radius =
-            min(width, height) * 0.38f
+        val radius = min(width, height) * 0.38f
+
+        // =====================================================
+        // DIAL BODY
+        // =====================================================
 
         paint.style = Paint.Style.FILL
         paint.color = 0xFF181818.toInt()
@@ -51,6 +61,10 @@ class DialView @JvmOverloads constructor(
             radius,
             paint
         )
+
+        // =====================================================
+        // OUTER RING
+        // =====================================================
 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 6f
@@ -63,92 +77,158 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        val startAngle = -135.0
+        // =====================================================
+        // SCALE
+        // =====================================================
 
-        val referenceRadius =
-            radius * 0.90f
+        val startAngle = -135.0
+        val sweepAngle = 270.0
+
+        paint.strokeWidth = 3f
+        paint.color = 0xFF777777.toInt()
+
+        for (i in 0..20) {
+
+            val angle =
+                startAngle +
+                        sweepAngle * (i / 20.0)
+
+            val rad =
+                Math.toRadians(angle)
+
+            val outer =
+                radius * 0.91f
+
+            val inner =
+                if (i % 5 == 0) {
+                    radius * 0.78f
+                } else {
+                    radius * 0.84f
+                }
+
+            val x1 =
+                cx +
+                        cos(rad).toFloat() *
+                        inner
+
+            val y1 =
+                cy +
+                        sin(rad).toFloat() *
+                        inner
+
+            val x2 =
+                cx +
+                        cos(rad).toFloat() *
+                        outer
+
+            val y2 =
+                cy +
+                        sin(rad).toFloat() *
+                        outer
+
+            canvas.drawLine(
+                x1,
+                y1,
+                x2,
+                y2,
+                paint
+            )
+        }
+
+        // =====================================================
+        // 1 Hz REFERENCE
+        // =====================================================
 
         val refRad =
             Math.toRadians(startAngle)
 
-        val x1 =
-            cx +
-                cos(refRad).toFloat() *
-                (radius * 0.72f)
-
-        val y1 =
-            cy +
-                sin(refRad).toFloat() *
-                (radius * 0.72f)
-
-        val x2 =
-            cx +
-                cos(refRad).toFloat() *
-                referenceRadius
-
-        val y2 =
-            cy +
-                sin(refRad).toFloat() *
-                referenceRadius
-
         paint.strokeWidth = 5f
         paint.color = 0xFFFFFFFF.toInt()
 
+        val refX1 =
+            cx +
+                    cos(refRad).toFloat() *
+                    (radius * 0.72f)
+
+        val refY1 =
+            cy +
+                    sin(refRad).toFloat() *
+                    (radius * 0.72f)
+
+        val refX2 =
+            cx +
+                    cos(refRad).toFloat() *
+                    (radius * 0.90f)
+
+        val refY2 =
+            cy +
+                    sin(refRad).toFloat() *
+                    (radius * 0.90f)
+
         canvas.drawLine(
-            x1,
-            y1,
-            x2,
-            y2,
+            refX1,
+            refY1,
+            refX2,
+            refY2,
             paint
         )
+
+        // =====================================================
+        // 1 Hz LABEL
+        // =====================================================
 
         paint.style = Paint.Style.FILL
         paint.textSize = radius * 0.14f
         paint.typeface = Typeface.DEFAULT_BOLD
         paint.textAlign = Paint.Align.CENTER
+        paint.color = 0xFFFFFFFF.toInt()
 
         canvas.drawText(
             "1 Hz",
             cx +
-                cos(refRad).toFloat() *
-                (radius * 0.58f),
+                    cos(refRad).toFloat() *
+                    (radius * 0.58f),
             cy +
-                sin(refRad).toFloat() *
-                (radius * 0.58f),
+                    sin(refRad).toFloat() *
+                    (radius * 0.58f),
             paint
         )
 
+        // =====================================================
+        // FREQUENCY NEEDLE
+        // =====================================================
+
         val normalized =
             (
-                currentFrequency -
-                    minFrequency
+                currentFrequency - minFrequency
             ) /
-                (
-                    maxFrequency -
-                        minFrequency
-                )
+                    (
+                        maxFrequency - minFrequency
+                    )
 
-        val angle =
-            -135.0 +
-                normalized * 270.0
+        val needleAngle =
+            startAngle +
+                    normalized * sweepAngle
 
-        val rad =
-            Math.toRadians(angle)
+        val needleRad =
+            Math.toRadians(needleAngle)
 
         val needleLength =
             radius * 0.68f
 
         val nx =
             cx +
-                cos(rad).toFloat() *
-                needleLength
+                    cos(needleRad).toFloat() *
+                    needleLength
 
         val ny =
             cy +
-                sin(rad).toFloat() *
-                needleLength
+                    sin(needleRad).toFloat() *
+                    needleLength
 
+        paint.style = Paint.Style.STROKE
         paint.strokeWidth = 8f
+        paint.strokeCap = Paint.Cap.ROUND
         paint.color = 0xFFFF4444.toInt()
 
         canvas.drawLine(
@@ -159,13 +239,26 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
+        // =====================================================
+        // CENTER
+        // =====================================================
+
         paint.style = Paint.Style.FILL
         paint.color = 0xFFFFFFFF.toInt()
 
         canvas.drawCircle(
             cx,
             cy,
-            10f,
+            11f,
+            paint
+        )
+
+        paint.color = 0xFF444444.toInt()
+
+        canvas.drawCircle(
+            cx,
+            cy,
+            5f,
             paint
         )
     }
@@ -174,8 +267,7 @@ class DialView @JvmOverloads constructor(
         event: MotionEvent
     ): Boolean {
 
-        val cx = width / 2f
-        val cy = height / 2f
+        val parentView = parent
 
         when (event.actionMasked) {
 
@@ -183,13 +275,22 @@ class DialView @JvmOverloads constructor(
 
                 touching = true
 
+                accumulatedDegrees = 0.0
+
                 lastAngle =
                     angleFromPoint(
                         event.x,
                         event.y,
-                        cx,
-                        cy
+                        width / 2f,
+                        height / 2f
                     )
+
+                // VERY IMPORTANT:
+                // Stop the ScrollView from stealing
+                // the finger while rotating the dial.
+                parentView?.requestDisallowInterceptTouchEvent(true)
+
+                performClick()
 
                 return true
             }
@@ -200,7 +301,10 @@ class DialView @JvmOverloads constructor(
                     return true
                 }
 
-                val angle =
+                val cx = width / 2f
+                val cy = height / 2f
+
+                val currentAngle =
                     angleFromPoint(
                         event.x,
                         event.y,
@@ -209,8 +313,9 @@ class DialView @JvmOverloads constructor(
                     )
 
                 var delta =
-                    angle - lastAngle
+                    currentAngle - lastAngle
 
+                // Handle crossing -180/+180.
                 if (delta > 180.0) {
                     delta -= 360.0
                 }
@@ -219,24 +324,66 @@ class DialView @JvmOverloads constructor(
                     delta += 360.0
                 }
 
-                lastAngle = angle
+                lastAngle = currentAngle
 
-                onRotate?.invoke(delta)
+                accumulatedDegrees += delta
+
+                // Only send meaningful movements.
+                if (
+                    kotlin.math.abs(
+                        accumulatedDegrees
+                    ) >= angleThreshold
+                ) {
+
+                    val sendDelta =
+                        accumulatedDegrees
+
+                    accumulatedDegrees = 0.0
+
+                    onRotate?.invoke(
+                        sendDelta
+                    )
+                }
 
                 invalidate()
 
                 return true
             }
 
-            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_UP -> {
+
+                touching = false
+
+                accumulatedDegrees = 0.0
+
+                parentView?.requestDisallowInterceptTouchEvent(
+                    false
+                )
+
+                performClick()
+
+                return true
+            }
+
             MotionEvent.ACTION_CANCEL -> {
 
                 touching = false
+
+                accumulatedDegrees = 0.0
+
+                parentView?.requestDisallowInterceptTouchEvent(
+                    false
+                )
 
                 return true
             }
         }
 
+        return true
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
         return true
     }
 
