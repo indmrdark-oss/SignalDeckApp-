@@ -62,143 +62,130 @@ class MainActivity : AppCompatActivity() {
     private lateinit var plus1Btn: Button
 
     private lateinit var downFreqBtn: Button
-    private lateinit var upFreqBtn: Button
+    private lateinit var upFreqBtn
 
     private lateinit var speed1xBtn: Button
     private lateinit var speed2xBtn: Button
 
-    private val ACTION_USB_PERMISSION =
-        "com.signaldeck.scope.USB_PERMISSION"
-
-    private val handler =
-        Handler(Looper.getMainLooper())
-
-    private var dialFrequency = 1000.0
+    private val handler = Handler(Looper.getMainLooper())
 
     private val F_MIN = 1.0
     private val F_MAX = 20000.0
 
-    /*
-     * These are ONLY used by the arrow buttons.
-     * The dial itself uses direct 1–20000 Hz positioning.
-     */
-    private var arrowSpeed = 1
+    private var dialFrequency = 1000.0
 
+    private var hzPerDegree = 3000.0 / 360.0
+
+    private var arrowSpeed = 1
     private var repeatDirection = 0
 
     private var liveCapture = false
 
-    private val repeatRunnable =
-        object : Runnable {
+    private val BAUD_RATE = 250000
 
-            override fun run() {
+    private val ACTION_USB_PERMISSION =
+        "com.signaldeck.scope.USB_PERMISSION"
 
-                if (repeatDirection == 0) {
-                    return
-                }
+    /*
+     * Repeating ▲ / ▼ buttons
+     */
+    private val repeatRunnable = object : Runnable {
+        override fun run() {
 
-                changeFrequencyFromArrow()
-
-                val delay =
-                    if (arrowSpeed == 1) {
-                        100L
-                    } else {
-                        50L
-                    }
-
-                handler.postDelayed(
-                    this,
-                    delay
-                )
+            if (repeatDirection == 0) {
+                return
             }
+
+            changeFrequencyFromArrow()
+
+            val delay =
+                if (arrowSpeed == 1) 100L else 50L
+
+            handler.postDelayed(this, delay)
         }
+    }
 
-    private val usbReceiver =
-        object : BroadcastReceiver() {
+    /*
+     * USB receiver
+     */
+    private val usbReceiver = object : BroadcastReceiver() {
 
-            override fun onReceive(
-                context: Context,
-                intent: Intent
-            ) {
+        override fun onReceive(
+            context: Context,
+            intent: Intent
+        ) {
 
-                try {
+            try {
 
-                    when (intent.action) {
+                when (intent.action) {
 
-                        ACTION_USB_PERMISSION -> {
+                    ACTION_USB_PERMISSION -> {
 
-                            val device: UsbDevice? =
-                                if (Build.VERSION.SDK_INT >= 33) {
+                        val device: UsbDevice? =
+                            if (Build.VERSION.SDK_INT >= 33) {
 
-                                    intent.getParcelableExtra(
-                                        UsbManager.EXTRA_DEVICE,
-                                        UsbDevice::class.java
-                                    )
-
-                                } else {
-
-                                    @Suppress("DEPRECATION")
-                                    intent.getParcelableExtra(
-                                        UsbManager.EXTRA_DEVICE
-                                    )
-                                }
-
-                            val granted =
-                                intent.getBooleanExtra(
-                                    UsbManager.EXTRA_PERMISSION_GRANTED,
-                                    false
-                                )
-
-                            if (
-                                granted &&
-                                device != null
-                            ) {
-
-                                connectToDevice(
-                                    device
+                                intent.getParcelableExtra(
+                                    UsbManager.EXTRA_DEVICE,
+                                    UsbDevice::class.java
                                 )
 
                             } else {
 
-                                appendLog(
-                                    "USB permission denied."
+                                @Suppress("DEPRECATION")
+                                intent.getParcelableExtra(
+                                    UsbManager.EXTRA_DEVICE
                                 )
                             }
-                        }
 
-                        UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
-
-                            appendLog(
-                                "Arduino attached. Tap Connect."
-                            )
-                        }
-
-                        UsbManager.ACTION_USB_DEVICE_DETACHED -> {
-
-                            appendLog(
-                                "USB device detached."
+                        val granted =
+                            intent.getBooleanExtra(
+                                UsbManager.EXTRA_PERMISSION_GRANTED,
+                                false
                             )
 
-                            disconnect()
+                        if (granted && device != null) {
+
+                            connectToDevice(device)
+
+                        } else {
+
+                            appendLog(
+                                "USB permission denied."
+                            )
                         }
                     }
 
-                } catch (e: Exception) {
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
 
-                    appendLog(
-                        "USB receiver error: ${e.message}"
-                    )
+                        appendLog(
+                            "Arduino attached. Tap Connect."
+                        )
+                    }
+
+                    UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+
+                        appendLog(
+                            "USB device detached."
+                        )
+
+                        disconnect()
+                    }
                 }
+
+            } catch (e: Exception) {
+
+                appendLog(
+                    "USB receiver error: ${e.message}"
+                )
             }
         }
+    }
 
     override fun onCreate(
         savedInstanceState: Bundle?
     ) {
 
-        super.onCreate(
-            savedInstanceState
-        )
+        super.onCreate(savedInstanceState)
 
         setContentView(
             R.layout.activity_main
@@ -209,135 +196,87 @@ class MainActivity : AppCompatActivity() {
                 Context.USB_SERVICE
             ) as UsbManager
 
+        /*
+         * Views
+         */
+
         scopeView =
-            findViewById(
-                R.id.scopeView
-            )
+            findViewById(R.id.scopeView)
 
         dialView =
-            findViewById(
-                R.id.dialView
-            )
+            findViewById(R.id.dialView)
 
         connStatus =
-            findViewById(
-                R.id.connStatus
-            )
+            findViewById(R.id.connStatus)
 
         connectBtn =
-            findViewById(
-                R.id.connectBtn
-            )
+            findViewById(R.id.connectBtn)
 
         liveCaptureBtn =
-            findViewById(
-                R.id.liveCaptureBtn
-            )
+            findViewById(R.id.liveCaptureBtn)
 
         reconBtn =
-            findViewById(
-                R.id.reconBtn
-            )
+            findViewById(R.id.reconBtn)
 
         cmdInput =
-            findViewById(
-                R.id.cmdInput
-            )
+            findViewById(R.id.cmdInput)
 
         sendBtn =
-            findViewById(
-                R.id.sendBtn
-            )
+            findViewById(R.id.sendBtn)
 
         logView =
-            findViewById(
-                R.id.logView
-            )
+            findViewById(R.id.logView)
 
         clearLogBtn =
-            findViewById(
-                R.id.clearLogBtn
-            )
+            findViewById(R.id.clearLogBtn)
 
         rTarget =
-            findViewById(
-                R.id.rTarget
-            )
+            findViewById(R.id.rTarget)
 
         rTargetBig =
-            findViewById(
-                R.id.rTargetBig
-            )
+            findViewById(R.id.rTargetBig)
 
         rMeasured =
-            findViewById(
-                R.id.rMeasured
-            )
+            findViewById(R.id.rMeasured)
 
         rDuty =
-            findViewById(
-                R.id.rDuty
-            )
+            findViewById(R.id.rDuty)
 
         rRate =
-            findViewById(
-                R.id.rRate
-            )
+            findViewById(R.id.rRate)
 
         rVoltage =
-            findViewById(
-                R.id.rVoltage
-            )
+            findViewById(R.id.rVoltage)
 
         coarseModeBtn =
-            findViewById(
-                R.id.coarseModeBtn
-            )
+            findViewById(R.id.coarseModeBtn)
 
         fineModeBtn =
-            findViewById(
-                R.id.fineModeBtn
-            )
+            findViewById(R.id.fineModeBtn)
 
         minus1Btn =
-            findViewById(
-                R.id.minus1Btn
-            )
+            findViewById(R.id.minus1Btn)
 
         minus01Btn =
-            findViewById(
-                R.id.minus01Btn
-            )
+            findViewById(R.id.minus01Btn)
 
         plus01Btn =
-            findViewById(
-                R.id.plus01Btn
-            )
+            findViewById(R.id.plus01Btn)
 
         plus1Btn =
-            findViewById(
-                R.id.plus1Btn
-            )
+            findViewById(R.id.plus1Btn)
 
         downFreqBtn =
-            findViewById(
-                R.id.downFreqBtn
-            )
+            findViewById(R.id.downFreqBtn)
 
         upFreqBtn =
-            findViewById(
-                R.id.upFreqBtn
-            )
+            findViewById(R.id.upFreqBtn)
 
         speed1xBtn =
-            findViewById(
-                R.id.speed1xBtn
-            )
+            findViewById(R.id.speed1xBtn)
 
         speed2xBtn =
-            findViewById(
-                R.id.speed2xBtn
-            )
+            findViewById(R.id.speed2xBtn)
 
         setupUsbReceiver()
         setupButtons()
@@ -346,10 +285,9 @@ class MainActivity : AppCompatActivity() {
         updateDialDisplay()
     }
 
-    // =========================================================
-    // USB RECEIVER
-    // =========================================================
-
+    /*
+     * USB receiver registration
+     */
     private fun setupUsbReceiver() {
 
         val filter =
@@ -386,22 +324,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // =========================================================
-    // BUTTONS
-    // =========================================================
-
+    /*
+     * Buttons
+     */
     private fun setupButtons() {
 
         connectBtn.setOnClickListener {
 
             if (serial != null) {
+
                 disconnect()
+
             } else {
+
                 requestDevice()
             }
         }
 
         clearLogBtn.setOnClickListener {
+
             logView.text = ""
         }
 
@@ -414,13 +355,9 @@ class MainActivity : AppCompatActivity() {
 
             if (command.isNotEmpty()) {
 
-                appendCommandLog(
-                    command
-                )
+                appendCommandLog(command)
 
-                serial?.writeLine(
-                    command
-                )
+                serial?.writeLine(command)
 
                 cmdInput.setText("")
             }
@@ -428,8 +365,7 @@ class MainActivity : AppCompatActivity() {
 
         liveCaptureBtn.setOnClickListener {
 
-            liveCapture =
-                !liveCapture
+            liveCapture = !liveCapture
 
             if (liveCapture) {
 
@@ -458,30 +394,37 @@ class MainActivity : AppCompatActivity() {
             liveCaptureBtn.text =
                 "Start Live Capture"
 
-            try {
-                scopeView.showReconstructed()
-            } catch (_: Exception) {
-            }
+            scopeView.showReconstructed()
 
             rVoltage.text =
                 "Voltage: --"
         }
 
-        /*
-         * Kept for compatibility with the existing UI.
-         * These do not affect the absolute-position dial.
-         */
         coarseModeBtn.setOnClickListener {
 
+            hzPerDegree =
+                3000.0 / 360.0
+
+            dialView.setSensitivity(
+                hzPerDegree
+            )
+
             appendLog(
-                "Dial: COARSE selected."
+                "Dial: COARSE — 1 rotation ≈ 3000 Hz"
             )
         }
 
         fineModeBtn.setOnClickListener {
 
+            hzPerDegree =
+                60.0 / 360.0
+
+            dialView.setSensitivity(
+                hzPerDegree
+            )
+
             appendLog(
-                "Dial: FINE selected."
+                "Dial: FINE — 1 rotation ≈ 60 Hz"
             )
         }
 
@@ -490,7 +433,7 @@ class MainActivity : AppCompatActivity() {
             arrowSpeed = 1
 
             appendLog(
-                "Arrow speed set to 1×"
+                "Arrow speed: 1×"
             )
         }
 
@@ -499,23 +442,27 @@ class MainActivity : AppCompatActivity() {
             arrowSpeed = 2
 
             appendLog(
-                "Arrow speed set to 2×"
+                "Arrow speed: 2×"
             )
         }
 
         minus1Btn.setOnClickListener {
+
             nudgeFrequency(-1.0)
         }
 
         minus01Btn.setOnClickListener {
+
             nudgeFrequency(-0.1)
         }
 
         plus01Btn.setOnClickListener {
+
             nudgeFrequency(0.1)
         }
 
         plus1Btn.setOnClickListener {
+
             nudgeFrequency(1.0)
         }
 
@@ -530,20 +477,24 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // =========================================================
-    // DIAL
-    // =========================================================
-
+    /*
+     * Dial
+     */
     private fun setupDial() {
 
+        dialView.setFrequencyRange(
+            F_MIN,
+            F_MAX
+        )
+
+        dialView.currentFrequency =
+            dialFrequency
+
         /*
-         * ABSOLUTE POSITION MODE
+         * Direct touch selection.
          *
-         * DialView calculates the actual frequency:
-         *
-         * 1 Hz -> 20000 Hz
-         *
-         * and sends that exact value here.
+         * The DialView calculates the frequency
+         * from the position touched on the dial.
          */
         dialView.onFrequencySelected =
             { frequency ->
@@ -560,10 +511,9 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    // =========================================================
-    // ARROW BUTTONS
-    // =========================================================
-
+    /*
+     * Arrow buttons
+     */
     private fun setupArrowButton(
         button: Button,
         direction: Int
@@ -609,6 +559,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /*
+     * Arrow frequency change
+     */
     private fun changeFrequencyFromArrow() {
 
         val step =
@@ -632,6 +585,9 @@ class MainActivity : AppCompatActivity() {
         sendFrequency()
     }
 
+    /*
+     * Exact frequency buttons
+     */
     private fun nudgeFrequency(
         amount: Double
     ) {
@@ -649,10 +605,9 @@ class MainActivity : AppCompatActivity() {
         sendFrequency()
     }
 
-    // =========================================================
-    // DISPLAY
-    // =========================================================
-
+    /*
+     * Update UI
+     */
     private fun updateDialDisplay() {
 
         val value =
@@ -674,10 +629,9 @@ class MainActivity : AppCompatActivity() {
         dialView.invalidate()
     }
 
-    // =========================================================
-    // SEND FREQUENCY
-    // =========================================================
-
+    /*
+     * Send frequency to Arduino
+     */
     private fun sendFrequency() {
 
         serial?.writeLine(
@@ -689,16 +643,13 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // =========================================================
-    // USB CONNECTION
-    // =========================================================
-
+    /*
+     * Find USB device
+     */
     private fun requestDevice() {
 
         val devices =
-            usbManager
-                .deviceList
-                .values
+            usbManager.deviceList.values
 
         if (devices.isEmpty()) {
 
@@ -713,14 +664,10 @@ class MainActivity : AppCompatActivity() {
             devices.first()
 
         if (
-            usbManager.hasPermission(
-                device
-            )
+            usbManager.hasPermission(device)
         ) {
 
-            connectToDevice(
-                device
-            )
+            connectToDevice(device)
 
         } else {
 
@@ -733,8 +680,11 @@ class MainActivity : AppCompatActivity() {
 
             val flags =
                 if (Build.VERSION.SDK_INT >= 31) {
+
                     PendingIntent.FLAG_MUTABLE
+
                 } else {
+
                     0
                 }
 
@@ -757,6 +707,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /*
+     * Connect using YOUR exact UsbSerialManager API
+     */
     private fun connectToDevice(
         device: UsbDevice
     ) {
@@ -771,7 +724,7 @@ class MainActivity : AppCompatActivity() {
 
             val opened =
                 manager.open(
-                    250000
+                    BAUD_RATE
                 )
 
             if (!opened) {
@@ -785,8 +738,7 @@ class MainActivity : AppCompatActivity() {
                 return
             }
 
-            serial =
-                manager
+            serial = manager
 
             connStatus.text =
                 "Connected"
@@ -795,7 +747,7 @@ class MainActivity : AppCompatActivity() {
                 "Disconnect"
 
             appendLog(
-                "USB serial connected."
+                "USB serial connected at $BAUD_RATE baud."
             )
 
             startReading()
@@ -816,10 +768,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // =========================================================
-    // USB READING
-    // =========================================================
-
+    /*
+     * Read USB serial data.
+     *
+     * UsbSerialManager has read(buffer, timeoutMs),
+     * NOT readLine().
+     */
     private fun startReading() {
 
         if (keepReading) {
@@ -832,7 +786,7 @@ class MainActivity : AppCompatActivity() {
             Thread {
 
                 val buffer =
-                    ByteArray(1024)
+                    ByteArray(4096)
 
                 val lineBuffer =
                     StringBuilder()
@@ -849,7 +803,7 @@ class MainActivity : AppCompatActivity() {
 
                         if (count > 0) {
 
-                            val chunk =
+                            val incoming =
                                 String(
                                     buffer,
                                     0,
@@ -858,17 +812,17 @@ class MainActivity : AppCompatActivity() {
                                 )
 
                             lineBuffer.append(
-                                chunk
+                                incoming
                             )
 
                             while (true) {
 
-                                val newline =
+                                val index =
                                     lineBuffer.indexOf(
                                         "\n"
                                     )
 
-                                if (newline < 0) {
+                                if (index < 0) {
                                     break
                                 }
 
@@ -876,8 +830,89 @@ class MainActivity : AppCompatActivity() {
                                     lineBuffer
                                         .substring(
                                             0,
-                                            newline
+                                            index
                                         )
                                         .trim()
 
-  
+                                lineBuffer.delete(
+                                    0,
+                                    index + 1
+                                )
+
+                                if (line.isNotEmpty()) {
+
+                                    handler.post {
+
+                                        processSerialLine(
+                                            line
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                    } catch (e: Exception) {
+
+                        if (keepReading) {
+
+                            handler.post {
+
+                                appendLog(
+                                    "Read error: ${e.message}"
+                                )
+                            }
+                        }
+
+                        break
+                    }
+                }
+            }
+
+        readThread?.start()
+    }
+
+    /*
+     * Arduino serial parser
+     */
+    private fun processSerialLine(
+        line: String
+    ) {
+
+        val text =
+            line.trim()
+
+        if (text.isEmpty()) {
+            return
+        }
+
+        appendSerialLog(text)
+
+        when {
+
+            text.startsWith(
+                "FREQ:",
+                ignoreCase = true
+            ) -> {
+
+                val value =
+                    text.substringAfter(
+                        ":"
+                    ).trim().toDoubleOrNull()
+
+                if (value != null) {
+
+                    scopeView.liveFreq =
+                        value
+
+                    rMeasured.text =
+                        String.format(
+                            Locale.US,
+                            "Measured: %.2f Hz",
+                            value
+                        )
+
+                    scopeView.invalidate()
+                }
+            }
+
+            text.startsWith(
