@@ -22,25 +22,40 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
+
+    // =========================================================
+    // USB
+    // =========================================================
 
     private lateinit var usbManager: UsbManager
     private var serial: UsbSerialManager? = null
 
     private var readThread: Thread? = null
-    @Volatile private var keepReading = false
+
+    @Volatile
+    private var keepReading = false
+
+    private val ACTION_USB_PERMISSION =
+        "com.signaldeck.scope.USB_PERMISSION"
+
+    // =========================================================
+    // UI
+    // =========================================================
 
     private lateinit var scopeView: ScopeView
     private lateinit var dialView: DialView
 
     private lateinit var connStatus: TextView
     private lateinit var connectBtn: Button
+
     private lateinit var liveCaptureBtn: Button
     private lateinit var reconBtn: Button
+
     private lateinit var cmdInput: EditText
     private lateinit var sendBtn: Button
+
     private lateinit var logView: TextView
     private lateinit var clearLogBtn: Button
 
@@ -60,29 +75,42 @@ class MainActivity : AppCompatActivity() {
     private lateinit var plus1Btn: Button
 
     private lateinit var downFreqBtn: Button
-    private lateinit var upFreqBtn: Button
+    private lateinit var upFreqBtn
 
-    private val ACTION_USB_PERMISSION =
-        "com.signaldeck.scope.USB_PERMISSION"
+    private lateinit var speed1xBtn: Button
+    private lateinit var speed2xBtn: Button
+
+    // =========================================================
+    // CAPTURE
+    // =========================================================
 
     private var capturing = false
+
     private var capRate = 0.0
+
     private var capSamples: IntArray? = null
 
     private var lineBuffer = StringBuilder()
 
     private var lastMeasuredHz = 0.0
+
     private var lastDuty = 50.0
+
     private var lastWaveform = false
+
+    // =========================================================
+    // HANDLER
+    // =========================================================
 
     private val uiHandler =
         Handler(Looper.getMainLooper())
 
     private var liveCaptureActive = false
+
     private var lastFrameArrivedMs = 0L
 
     // =========================================================
-    // FREQUENCY DIAL
+    // FREQUENCY
     // =========================================================
 
     private var dialFrequency = 1000.0
@@ -94,32 +122,59 @@ class MainActivity : AppCompatActivity() {
         3000.0 / 360.0
 
     private var pendingSend = false
+
     private val sendThrottleMs = 60L
 
     // =========================================================
-    // HOLD ARROW CONTROL
+    // ARROW HOLD CONTROL
     // =========================================================
 
     private var freqRepeatDirection = 0
 
     /*
-     * Hold arrow:
+     * 1×:
+     * 1 Hz every 100 ms
+     * ≈ 10 Hz/sec
      *
-     * First change happens immediately.
-     * Then wait 300 ms.
-     * Then change by 1 Hz every 100 ms.
-     *
-     * = about 10 Hz/second.
+     * 2×:
+     * 5 Hz every 100 ms
+     * ≈ 50 Hz/sec
      */
+
+    private var arrowSpeedMultiplier = 1
+
     private val freqRepeatRunnable =
         object : Runnable {
 
             override fun run() {
 
-                if (freqRepeatDirection == 0)
+                if (freqRepeatDirection == 0) {
                     return
+                }
 
-                changeFrequency(1.0 * freqRepeatDirection)
+                val step =
+                    if (arrowSpeedMultiplier == 1) {
+                        1.0
+                    } else {
+                        5.0
+                    }
+
+                dialFrequency =
+                    (
+                        dialFrequency +
+                                freqRepeatDirection * step
+                        ).coerceIn(
+                            F_MIN,
+                            F_MAX
+                        )
+
+                updateDialDisplay()
+
+                serial?.writeLine(
+                    "F%.2f".format(
+                        dialFrequency
+                    )
+                )
 
                 uiHandler.postDelayed(
                     this,
@@ -129,7 +184,7 @@ class MainActivity : AppCompatActivity() {
         }
 
     // =========================================================
-    // LIVE CAPTURE
+    // LIVE CAPTURE LOOP
     // =========================================================
 
     private val liveCaptureLoop =
@@ -137,11 +192,13 @@ class MainActivity : AppCompatActivity() {
 
             override fun run() {
 
-                if (!liveCaptureActive)
+                if (!liveCaptureActive) {
                     return
+                }
 
-                if (!capturing)
+                if (!capturing) {
                     serial?.writeLine("C")
+                }
 
                 uiHandler.postDelayed(
                     this,
@@ -161,7 +218,11 @@ class MainActivity : AppCompatActivity() {
 
                 if (pendingSend) {
 
-                    sendFrequency()
+                    serial?.writeLine(
+                        "F%.2f".format(
+                            dialFrequency
+                        )
+                    )
 
                     pendingSend = false
                 }
@@ -194,7 +255,9 @@ class MainActivity : AppCompatActivity() {
                             synchronized(this) {
 
                                 val device: UsbDevice? =
-                                    if (Build.VERSION.SDK_INT >= 33) {
+                                    if (
+                                        Build.VERSION.SDK_INT >= 33
+                                    ) {
 
                                         intent.getParcelableExtra(
                                             UsbManager.EXTRA_DEVICE,
@@ -211,7 +274,7 @@ class MainActivity : AppCompatActivity() {
 
                                 val granted =
                                     intent.getBooleanExtra(
-                                        UsbManager.EXTRA_PERMISSION_GRANTED,
+                                        UsbManager.EXTRA_USB_PERMISSION,
                                         false
                                     )
 
@@ -220,7 +283,9 @@ class MainActivity : AppCompatActivity() {
                                     device != null
                                 ) {
 
-                                    connectToDevice(device)
+                                    connectToDevice(
+                                        device
+                                    )
 
                                 } else {
 
@@ -251,7 +316,8 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
 
                     appendLog(
-                        "CRASH in usbReceiver: ${e}"
+                        "CRASH in usbReceiver: " +
+                                e.toString()
                     )
                 }
             }
@@ -265,7 +331,9 @@ class MainActivity : AppCompatActivity() {
         savedInstanceState: Bundle?
     ) {
 
-        super.onCreate(savedInstanceState)
+        super.onCreate(
+            savedInstanceState
+        )
 
         setContentView(
             R.layout.activity_main
@@ -275,6 +343,10 @@ class MainActivity : AppCompatActivity() {
             getSystemService(
                 Context.USB_SERVICE
             ) as UsbManager
+
+        // =====================================================
+        // FIND VIEWS
+        // =====================================================
 
         scopeView =
             findViewById(R.id.scopeView)
@@ -348,6 +420,12 @@ class MainActivity : AppCompatActivity() {
         upFreqBtn =
             findViewById(R.id.upFreqBtn)
 
+        speed1xBtn =
+            findViewById(R.id.speed1xBtn)
+
+        speed2xBtn =
+            findViewById(R.id.speed2xBtn)
+
         // =====================================================
         // USB BROADCAST
         // =====================================================
@@ -396,15 +474,19 @@ class MainActivity : AppCompatActivity() {
             try {
 
                 if (serial != null) {
+
                     disconnect()
+
                 } else {
+
                     requestDevice()
                 }
 
             } catch (e: Exception) {
 
                 appendLog(
-                    "CRASH on Connect tap: $e"
+                    "CRASH on Connect tap: " +
+                            e.toString()
                 )
             }
         }
@@ -465,6 +547,7 @@ class MainActivity : AppCompatActivity() {
         // =====================================================
 
         clearLogBtn.setOnClickListener {
+
             logView.text = ""
         }
 
@@ -475,7 +558,9 @@ class MainActivity : AppCompatActivity() {
         sendBtn.setOnClickListener {
 
             val text =
-                cmdInput.text.toString().trim()
+                cmdInput.text
+                    .toString()
+                    .trim()
 
             if (text.isNotEmpty()) {
 
@@ -488,7 +573,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // ROTARY DIAL
+        // DIAL
         // =====================================================
 
         dialView.onRotate =
@@ -500,11 +585,11 @@ class MainActivity : AppCompatActivity() {
                 dialFrequency =
                     (
                         dialFrequency +
-                            deltaHz
-                    ).coerceIn(
-                        F_MIN,
-                        F_MAX
-                    )
+                                deltaHz
+                        ).coerceIn(
+                            F_MIN,
+                            F_MAX
+                        )
 
                 updateDialDisplay()
 
@@ -512,7 +597,7 @@ class MainActivity : AppCompatActivity() {
             }
 
         // =====================================================
-        // COARSE MODE
+        // COARSE
         // =====================================================
 
         coarseModeBtn.setOnClickListener {
@@ -521,12 +606,13 @@ class MainActivity : AppCompatActivity() {
                 3000.0 / 360.0
 
             appendLog(
-                "Dial: COARSE mode — 1 rotation ≈ 3000 Hz"
+                "Dial: COARSE mode " +
+                        "(1 turn ≈ 3000 Hz)"
             )
         }
 
         // =====================================================
-        // FINE MODE
+        // FINE
         // =====================================================
 
         fineModeBtn.setOnClickListener {
@@ -535,12 +621,39 @@ class MainActivity : AppCompatActivity() {
                 60.0 / 360.0
 
             appendLog(
-                "Dial: FINE mode — 1 rotation ≈ 60 Hz"
+                "Dial: FINE mode " +
+                        "(1 turn ≈ 60 Hz)"
             )
         }
 
         // =====================================================
-        // DOWN ARROW — HOLD
+        // ARROW SPEED 1×
+        // =====================================================
+
+        speed1xBtn.setOnClickListener {
+
+            arrowSpeedMultiplier = 1
+
+            appendLog(
+                "Arrow speed: 1× ≈ 10 Hz/sec"
+            )
+        }
+
+        // =====================================================
+        // ARROW SPEED 2×
+        // =====================================================
+
+        speed2xBtn.setOnClickListener {
+
+            arrowSpeedMultiplier = 2
+
+            appendLog(
+                "Arrow speed: 2× ≈ 50 Hz/sec"
+            )
+        }
+
+        // =====================================================
+        // DOWN ARROW
         // =====================================================
 
         downFreqBtn.setOnTouchListener {
@@ -552,9 +665,10 @@ class MainActivity : AppCompatActivity() {
 
                     freqRepeatDirection = -1
 
-                    // Immediate first step
-                    changeFrequency(-1.0)
+                    // Immediate first step.
+                    changeFrequencyFromArrow()
 
+                    // Start continuous repeat.
                     startFrequencyRepeat()
 
                     true
@@ -573,7 +687,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // UP ARROW — HOLD
+        // UP ARROW
         // =====================================================
 
         upFreqBtn.setOnTouchListener {
@@ -585,9 +699,10 @@ class MainActivity : AppCompatActivity() {
 
                     freqRepeatDirection = 1
 
-                    // Immediate first step
-                    changeFrequency(1.0)
+                    // Immediate first step.
+                    changeFrequencyFromArrow()
 
+                    // Start continuous repeat.
                     startFrequencyRepeat()
 
                     true
@@ -610,19 +725,23 @@ class MainActivity : AppCompatActivity() {
         // =====================================================
 
         minus1Btn.setOnClickListener {
-            changeFrequency(-1.0)
+
+            nudgeFrequency(-1.0)
         }
 
         minus01Btn.setOnClickListener {
-            changeFrequency(-0.1)
+
+            nudgeFrequency(-0.1)
         }
 
         plus01Btn.setOnClickListener {
-            changeFrequency(0.1)
+
+            nudgeFrequency(0.1)
         }
 
         plus1Btn.setOnClickListener {
-            changeFrequency(1.0)
+
+            nudgeFrequency(1.0)
         }
 
         // =====================================================
@@ -637,667 +756,36 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // FREQUENCY CHANGE
+    // CHANGE FREQUENCY FROM ARROW
     // =========================================================
 
-    private fun changeFrequency(
-        delta: Double
-    ) {
+    private fun changeFrequencyFromArrow() {
+
+        val step =
+            if (arrowSpeedMultiplier == 1) {
+                1.0
+            } else {
+                5.0
+            }
 
         dialFrequency =
             (
-                dialFrequency + delta
-            ).coerceIn(
-                F_MIN,
-                F_MAX
-            )
+                dialFrequency +
+                        freqRepeatDirection * step
+                ).coerceIn(
+                    F_MIN,
+                    F_MAX
+                )
 
         updateDialDisplay()
 
-        sendFrequency()
-    }
-
-    // =========================================================
-    // SEND FREQUENCY TO ARDUINO
-    // =========================================================
-
-    private fun sendFrequency() {
-
-        val command =
-            String.format(
-                Locale.US,
-                "F%.2f",
+        serial?.writeLine(
+            "F%.2f".format(
                 dialFrequency
             )
-
-        serial?.writeLine(command)
+        )
     }
 
     // =========================================================
     // START ARROW REPEAT
-    // =========================================================
-
-    private fun startFrequencyRepeat() {
-
-        uiHandler.removeCallbacks(
-            freqRepeatRunnable
-        )
-
-        /*
-         * 300 ms delay before repeating.
-         * This prevents accidental rapid jumps.
-         */
-        uiHandler.postDelayed(
-            freqRepeatRunnable,
-            300L
-        )
-    }
-
-    // =========================================================
-    // STOP ARROW REPEAT
-    // =========================================================
-
-    private fun stopFrequencyRepeat() {
-
-        freqRepeatDirection = 0
-
-        uiHandler.removeCallbacks(
-            freqRepeatRunnable
-        )
-    }
-
-    // =========================================================
-    // DIAL DISPLAY
-    // =========================================================
-
-    private fun updateDialDisplay() {
-
-        rTargetBig.text =
-            String.format(
-                Locale.US,
-                "%.2f Hz",
-                dialFrequency
-            )
-
-        rTarget.text =
-            String.format(
-                Locale.US,
-                "Target: %.2f Hz",
-                dialFrequency
-            )
-    }
-
-    // =========================================================
-    // USB DEVICE REQUEST
-    // =========================================================
-
-    private fun requestDevice() {
-
-        val devices =
-            usbManager.deviceList.values
-
-        if (devices.isEmpty()) {
-
-            appendLog(
-                "No USB device found. " +
-                    "Check the cable and that Arduino is plugged in."
-            )
-
-            return
-        }
-
-        val device =
-            devices.first()
-
-        /*
-         * Explicitly construct Intent with a String.
-         * This avoids the Kotlin overload ambiguity.
-         */
-        val usbPermissionIntent =
-            Intent(ACTION_USB_PERMISSION).apply {
-                setPackage(packageName)
-            }
-
-        val flags =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                PendingIntent.FLAG_MUTABLE
-            } else {
-                0
-            }
-
-        val permissionIntent =
-            PendingIntent.getBroadcast(
-                this,
-                0,
-                usbPermissionIntent,
-                flags
-            )
-
-        if (
-            usbManager.hasPermission(device)
-        ) {
-
-            connectToDevice(device)
-
-        } else {
-
-            usbManager.requestPermission(
-                device,
-                permissionIntent
-            )
-        }
-    }
-
-    // =========================================================
-    // CONNECT TO ARDUINO
-    // =========================================================
-
-    private fun connectToDevice(
-        device: UsbDevice
-    ) {
-
-        try {
-
-            val mgr =
-                UsbSerialManager(
-                    usbManager,
-                    device
-                )
-
-            val opened =
-                mgr.open(250000)
-
-            if (!opened) {
-
-                appendLog(
-                    "Failed to open device as CDC-ACM serial."
-                )
-
-                return
-            }
-
-            serial = mgr
-
-            connStatus.text =
-                "Connected · 250000 baud"
-
-            connStatus.setTextColor(
-                0xFF4DFFA0.toInt()
-            )
-
-            appendLog(
-                "USB serial connected."
-            )
-
-            startReadLoop()
-
-            // Synchronize Arduino with current frequency
-            sendFrequency()
-
-        } catch (e: Exception) {
-
-            appendLog(
-                "CRASH in connectToDevice: $e"
-            )
-        }
-    }
-
-    // =========================================================
-    // DISCONNECT
-    // =========================================================
-
-    private fun disconnect() {
-
-        keepReading = false
-
-        liveCaptureActive = false
-
-        stopFrequencyRepeat()
-
-        liveCaptureBtn.text =
-            "Start Live Capture"
-
-        readThread = null
-
-        try {
-            serial?.close()
-        } catch (_: Exception) {
-        }
-
-        serial = null
-
-        connStatus.text =
-            "Not connected"
-
-        connStatus.setTextColor(
-            0xFFFF5A5A.toInt()
-        )
-    }
-
-    // =========================================================
-    // SERIAL READ LOOP
-    // =========================================================
-
-    private fun startReadLoop() {
-
-        keepReading = true
-
-        readThread =
-            Thread {
-
-                val buf =
-                    ByteArray(512)
-
-                while (keepReading) {
-
-                    val n =
-                        try {
-
-                            serial?.read(
-                                buf,
-                                200
-                            ) ?: -1
-
-                        } catch (
-                            e: Exception
-                        ) {
-
-                            -1
-                        }
-
-                    if (n > 0) {
-
-                        val chunk =
-                            String(
-                                buf,
-                                0,
-                                n,
-                                Charsets.US_ASCII
-                            )
-
-                        lineBuffer.append(
-                            chunk
-                        )
-
-                        var idx: Int
-
-                        while (
-                            lineBuffer
-                                .indexOf("\n")
-                                .also { idx = it } >= 0
-                        ) {
-
-                            val line =
-                                lineBuffer
-                                    .substring(
-                                        0,
-                                        idx
-                                    )
-                                    .trim()
-
-                            lineBuffer.delete(
-                                0,
-                                idx + 1
-                            )
-
-                            runOnUiThread {
-                                handleLine(line)
-                            }
-                        }
-                    }
-                }
-            }
-
-        readThread?.start()
-    }
-
-    // =========================================================
-    // HANDLE SERIAL LINE
-    // =========================================================
-
-    private fun handleLine(
-        line: String
-    ) {
-
-        if (line.startsWith("AI>")) {
-
-            appendLog(line)
-            return
-        }
-
-        if (line.startsWith("CAP,")) {
-
-            val parts =
-                line.split(",")
-
-            capturing = true
-
-            capRate =
-                parts
-                    .getOrNull(2)
-                    ?.toDoubleOrNull()
-                    ?: 0.0
-
-            capSamples = null
-
-            return
-        }
-
-        if (capturing) {
-
-            if (line == "ENDCAP") {
-
-                capturing = false
-
-                onCaptureComplete()
-
-                return
-            }
-
-            if (
-                line.isNotEmpty() &&
-                line.matches(
-                    Regex("^[0-9,]+$")
-                )
-            ) {
-
-                capSamples =
-                    line
-                        .split(",")
-                        .map {
-                            it.toIntOrNull() ?: 0
-                        }
-                        .toIntArray()
-
-                return
-            }
-        }
-
-        if (line.startsWith("Target:")) {
-
-            parseStatusLine(line)
-
-            return
-        }
-
-        appendLog(line)
-    }
-
-    // =========================================================
-    // PARSE STATUS
-    // =========================================================
-
-    private fun parseStatusLine(
-        line: String
-    ) {
-
-        val noSignal =
-            line.contains("NO SIGNAL")
-
-        if (!noSignal) {
-
-            Regex(
-                "Measured:\\s*([\\d.]+)"
-            ).find(line)?.let {
-
-                lastMeasuredHz =
-                    it.groupValues[1]
-                        .toDouble()
-            }
-        }
-
-        Regex(
-            "Duty:\\s*([\\d.]+)"
-        ).find(line)?.let {
-
-            lastDuty =
-                it.groupValues[1]
-                    .toDouble()
-        }
-
-        lastWaveform =
-            !noSignal
-
-        rTarget.text =
-            String.format(
-                Locale.US,
-                "Target: %.2f Hz",
-                dialFrequency
-            )
-
-        rMeasured.text =
-            if (lastWaveform) {
-
-                String.format(
-                    Locale.US,
-                    "Measured: %.2f Hz",
-                    lastMeasuredHz
-                )
-
-            } else {
-
-                "Measured: NO SIGNAL"
-            }
-
-        rDuty.text =
-            String.format(
-                Locale.US,
-                "Duty: %.1f%%",
-                lastDuty
-            )
-
-        scopeView.liveFreq =
-            if (lastWaveform)
-                lastMeasuredHz
-            else
-                dialFrequency
-
-        scopeView.liveDuty =
-            lastDuty
-
-        scopeView.waveformPresent =
-            lastWaveform
-    }
-
-    // =========================================================
-    // CAPTURE COMPLETE
-    // =========================================================
-
-    private fun onCaptureComplete() {
-
-        val samples =
-            capSamples ?: return
-
-        val freq =
-            if (lastWaveform)
-                lastMeasuredHz
-            else
-                dialFrequency
-
-        val spc =
-            if (freq > 0)
-                capRate / freq
-            else
-                0.0
-
-        val now =
-            System.currentTimeMillis()
-
-        val fps =
-            if (lastFrameArrivedMs > 0) {
-
-                1000.0 /
-                    (now - lastFrameArrivedMs)
-
-            } else {
-
-                0.0
-            }
-
-        lastFrameArrivedMs = now
-
-        if (liveCaptureActive) {
-
-            rRate.text =
-                String.format(
-                    Locale.US,
-                    "Real frame rate: %.1f fps",
-                    fps
-                )
-        }
-
-        if (samples.isNotEmpty()) {
-
-            val minV =
-                (samples.min() / 255.0) * 5.0
-
-            val maxV =
-                (samples.max() / 255.0) * 5.0
-
-            val avgV =
-                (samples.average() / 255.0) * 5.0
-
-            rVoltage.text =
-                String.format(
-                    Locale.US,
-                    "Voltage: min %.2fV | max %.2fV | avg %.2fV | Vpp %.2fV (real ADC readings)",
-                    minV,
-                    maxV,
-                    avgV,
-                    maxV - minV
-                )
-        }
-
-        val label =
-            when {
-
-                spc >= 10 ->
-                    String.format(
-                        Locale.US,
-                        "CAPTURED · HIGH FIDELITY (%.1f samples/cycle)",
-                        spc
-                    )
-
-                spc >= 4 ->
-                    String.format(
-                        Locale.US,
-                        "CAPTURED · REDUCED DETAIL (%.1f samples/cycle)",
-                        spc
-                    )
-
-                else ->
-                    "TOO FAST TO CAPTURE - SWITCH TO RECONSTRUCTED"
-            }
-
-        if (spc >= 4) {
-
-            scopeView.showCaptured(
-                samples,
-                label,
-                capRate
-            )
-
-        } else {
-
-            scopeView.showReconstructed()
-        }
-    }
-
-    // =========================================================
-    // LOGGING
-    // =========================================================
-
-    private fun appendLog(
-        line: String
-    ) {
-
-        runOnUiThread {
-
-            logView.append(
-                line + "\n"
-            )
-        }
-    }
-
-    private fun appendCommandLog(
-        text: String
-    ) {
-
-        runOnUiThread {
-
-            val display =
-                ">> $text\n"
-
-            val spannable =
-                SpannableString(
-                    display
-                )
-
-            spannable.setSpan(
-                ForegroundColorSpan(
-                    Color.RED
-                ),
-                0,
-                display.length,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-
-            spannable.setSpan(
-                StyleSpan(
-                    Typeface.BOLD
-                ),
-                0,
-                display.length,
-                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-
-            logView.append(
-                spannable
-            )
-        }
-    }
-
-    // =========================================================
-    // CLEANUP
-    // =========================================================
-
-    override fun onPause() {
-
-        super.onPause()
-
-        stopFrequencyRepeat()
-    }
-
-    override fun onDestroy() {
-
-        stopFrequencyRepeat()
-
-        uiHandler.removeCallbacks(
-            liveCaptureLoop
-        )
-
-        uiHandler.removeCallbacks(
-            throttledSender
-        )
-
-        keepReading = false
-
-        liveCaptureActive = false
-
-        try {
-            unregisterReceiver(
-                usbReceiver
-            )
-        } catch (_: Exception) {
-        }
-
-        try {
-            serial?.close()
-        } catch (_: Exception) {
-        }
-
-        serial = null
-
-        super.onDestroy()
-    }
-}
+    // ==================
