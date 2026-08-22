@@ -17,17 +17,14 @@ class DialView @JvmOverloads constructor(
     attrs: AttributeSet? = null
 ) : View(context, attrs) {
 
-    var onRotate:
-        ((Double) -> Unit)? = null
+    var onRotate: ((Double) -> Unit)? = null
 
-    var currentFrequency:
-        Double = 1000.0
+    var currentFrequency: Double = 1000.0
 
     private val paint =
         Paint(Paint.ANTI_ALIAS_FLAG)
 
     private var lastAngle = 0.0
-
     private var touching = false
 
     private val minFrequency = 1.0
@@ -52,9 +49,8 @@ class DialView @JvmOverloads constructor(
         paint.style =
             Paint.Style.FILL
 
-        paint.setColor(
+        paint.color =
             0xFF181818.toInt()
-        )
 
         canvas.drawCircle(
             cx,
@@ -70,9 +66,8 @@ class DialView @JvmOverloads constructor(
         paint.strokeWidth =
             6f
 
-        paint.setColor(
+        paint.color =
             0xFF555555.toInt()
-        )
 
         canvas.drawCircle(
             cx,
@@ -81,10 +76,7 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        // =====================================================
-        // FIXED 1 Hz REFERENCE POINT
-        // =====================================================
-
+        // 1 Hz reference
         val startAngle =
             -135.0
 
@@ -98,30 +90,29 @@ class DialView @JvmOverloads constructor(
 
         val x1 =
             cx +
-                    cos(refRad).toFloat() *
-                    (radius * 0.72f)
+                cos(refRad).toFloat() *
+                (radius * 0.72f)
 
         val y1 =
             cy +
-                    sin(refRad).toFloat() *
-                    (radius * 0.72f)
+                sin(refRad).toFloat() *
+                (radius * 0.72f)
 
         val x2 =
             cx +
-                    cos(refRad).toFloat() *
-                    referenceRadius
+                cos(refRad).toFloat() *
+                referenceRadius
 
         val y2 =
             cy +
-                    sin(refRad).toFloat() *
-                    referenceRadius
+                sin(refRad).toFloat() *
+                referenceRadius
 
         paint.strokeWidth =
             5f
 
-        paint.setColor(
+        paint.color =
             0xFFFFFFFF.toInt()
-        )
 
         canvas.drawLine(
             x1,
@@ -147,31 +138,28 @@ class DialView @JvmOverloads constructor(
         canvas.drawText(
             "1 Hz",
             cx +
-                    cos(refRad).toFloat() *
-                    (radius * 0.58f),
+                cos(refRad).toFloat() *
+                (radius * 0.58f),
             cy +
-                    sin(refRad).toFloat() *
-                    (radius * 0.58f),
+                sin(refRad).toFloat() *
+                (radius * 0.58f),
             paint
         )
 
-        // =====================================================
-        // FREQUENCY POSITION
-        // =====================================================
-
+        // Frequency position
         val normalized =
             (
                 currentFrequency -
+                    minFrequency
+            ) /
+                (
+                    maxFrequency -
                         minFrequency
-                ) /
-                    (
-                        maxFrequency -
-                                minFrequency
-                        )
+                )
 
         val angle =
             -135.0 +
-                    normalized * 270.0
+                normalized * 270.0
 
         val rad =
             Math.toRadians(angle)
@@ -181,20 +169,19 @@ class DialView @JvmOverloads constructor(
 
         val nx =
             cx +
-                    cos(rad).toFloat() *
-                    needleLength
+                cos(rad).toFloat() *
+                needleLength
 
         val ny =
             cy +
-                    sin(rad).toFloat() *
-                    needleLength
+                sin(rad).toFloat() *
+                needleLength
 
         paint.strokeWidth =
             8f
 
-        paint.setColor(
+        paint.color =
             0xFFFF4444.toInt()
-        )
 
         canvas.drawLine(
             cx,
@@ -208,9 +195,8 @@ class DialView @JvmOverloads constructor(
         paint.style =
             Paint.Style.FILL
 
-        paint.setColor(
+        paint.color =
             0xFFFFFFFF.toInt()
-        )
 
         canvas.drawCircle(
             cx,
@@ -272,7 +258,8 @@ class DialView @JvmOverloads constructor(
                     delta += 360
                 }
 
-                lastAngle = angle
+                lastAngle =
+                    angle
 
                 onRotate?.invoke(
                     delta
