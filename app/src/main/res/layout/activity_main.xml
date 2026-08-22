@@ -12,9 +12,7 @@
         android:orientation="vertical"
         android:padding="12dp">
 
-        <!-- ================================================= -->
         <!-- CONNECTION -->
-        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -38,9 +36,7 @@
                 android:text="Connect"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- SCOPE -->
-        <!-- ================================================= -->
 
         <com.signaldeck.scope.ScopeView
             android:id="@+id/scopeView"
@@ -48,9 +44,7 @@
             android:layout_height="260dp"
             android:layout_marginTop="10dp"/>
 
-        <!-- ================================================= -->
         <!-- TARGET -->
-        <!-- ================================================= -->
 
         <TextView
             android:id="@+id/rTarget"
@@ -73,9 +67,7 @@
             android:gravity="center"
             android:padding="6dp"/>
 
-        <!-- ================================================= -->
         <!-- DIAL -->
-        <!-- ================================================= -->
 
         <com.signaldeck.scope.DialView
             android:id="@+id/dialView"
@@ -83,9 +75,7 @@
             android:layout_height="300dp"
             android:layout_marginTop="8dp"/>
 
-        <!-- ================================================= -->
         <!-- DIAL MODES -->
-        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -107,9 +97,7 @@
                 android:text="FINE"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- ARROW SPEED -->
-        <!-- ================================================= -->
 
         <TextView
             android:layout_width="match_parent"
@@ -140,9 +128,7 @@
                 android:text="2×"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- UP / DOWN -->
-        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -168,9 +154,7 @@
                 android:textSize="28sp"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- EXACT NUDGE -->
-        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -206,9 +190,7 @@
                 android:text="+1 Hz"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- MEASUREMENTS -->
-        <!-- ================================================= -->
 
         <TextView
             android:id="@+id/rMeasured"
@@ -246,9 +228,7 @@
             android:textSize="16sp"
             android:padding="6dp"/>
 
-        <!-- ================================================= -->
         <!-- CAPTURE -->
-        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -270,9 +250,7 @@
                 android:text="Reconstructed"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- COMMAND -->
-        <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -297,9 +275,7 @@
                 android:text="SEND"/>
         </LinearLayout>
 
-        <!-- ================================================= -->
         <!-- LOG -->
-        <!-- ================================================= -->
 
         <Button
             android:id="@+id/clearLogBtn"
