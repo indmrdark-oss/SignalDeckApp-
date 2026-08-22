@@ -7,7 +7,6 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
-import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
@@ -28,14 +27,16 @@ class DialView @JvmOverloads constructor(
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-    private var lastAngle = 0.0
-    private var touching = false
-
     private val minFrequency = 1.0
     private val maxFrequency = 20000.0
 
-    // Very small dead-zone only for touch noise.
-    private val noiseThreshold = 0.03
+    // Dial travel:
+    // -135° = minimum
+    // +135° = maximum
+    private val startAngle = -135.0
+    private val sweepAngle = 270.0
+
+    private var touching = false
 
     override fun onDraw(canvas: Canvas) {
 
@@ -78,9 +79,6 @@ class DialView @JvmOverloads constructor(
         // TICKS
         // =====================================================
 
-        val startAngle = -135.0
-        val sweepAngle = 270.0
-
         paint.strokeWidth = 3f
         paint.color = 0xFF777777.toInt()
 
@@ -90,9 +88,11 @@ class DialView @JvmOverloads constructor(
                 startAngle +
                         sweepAngle * (i / 20.0)
 
-            val rad = Math.toRadians(angle)
+            val rad =
+                Math.toRadians(angle)
 
-            val outer = radius * 0.91f
+            val outer =
+                radius * 0.91f
 
             val inner =
                 if (i % 5 == 0) {
@@ -101,23 +101,11 @@ class DialView @JvmOverloads constructor(
                     radius * 0.84f
                 }
 
-            val x1 =
-                cx + cos(rad).toFloat() * inner
-
-            val y1 =
-                cy + sin(rad).toFloat() * inner
-
-            val x2 =
-                cx + cos(rad).toFloat() * outer
-
-            val y2 =
-                cy + sin(rad).toFloat() * outer
-
             canvas.drawLine(
-                x1,
-                y1,
-                x2,
-                y2,
+                cx + cos(rad).toFloat() * inner,
+                cy + sin(rad).toFloat() * inner,
+                cx + cos(rad).toFloat() * outer,
+                cy + sin(rad).toFloat() * outer,
                 paint
             )
         }
@@ -158,7 +146,7 @@ class DialView @JvmOverloads constructor(
         )
 
         // =====================================================
-        // NEEDLE
+        // NEEDLE POSITION
         // =====================================================
 
         val normalized =
@@ -173,17 +161,25 @@ class DialView @JvmOverloads constructor(
             startAngle +
                     normalized * sweepAngle
 
-        val rad =
+        val needleRad =
             Math.toRadians(needleAngle)
 
         val needleLength =
             radius * 0.68f
 
         val nx =
-            cx + cos(rad).toFloat() * needleLength
+            cx +
+                    cos(needleRad).toFloat() *
+                    needleLength
 
         val ny =
-            cy + sin(rad).toFloat() * needleLength
+            cy +
+                    sin(needleRad).toFloat() *
+                    needleLength
+
+        // =====================================================
+        // NEEDLE
+        // =====================================================
 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 8f
@@ -231,22 +227,26 @@ class DialView @JvmOverloads constructor(
 
         when (event.actionMasked) {
 
+            // =================================================
+            // TOUCH
+            // =================================================
+
             MotionEvent.ACTION_DOWN -> {
 
                 touching = true
 
-                lastAngle =
-                    angleFromPoint(
-                        event.x,
-                        event.y,
-                        cx,
-                        cy
-                    )
-
-                // Prevent ScrollView from stealing
-                // the touch while using the dial.
+                // Don't let the parent ScrollView
+                // steal our touch.
                 parent?.requestDisallowInterceptTouchEvent(
                     true
+                )
+
+                // INSTANTLY MOVE TO FINGER POSITION
+                setFrequencyFromTouch(
+                    event.x,
+                    event.y,
+                    cx,
+                    cy
                 )
 
                 performClick()
@@ -254,45 +254,29 @@ class DialView @JvmOverloads constructor(
                 return true
             }
 
+            // =================================================
+            // DRAG
+            // =================================================
+
             MotionEvent.ACTION_MOVE -> {
 
                 if (!touching) {
                     return true
                 }
 
-                val currentAngle =
-                    angleFromPoint(
-                        event.x,
-                        event.y,
-                        cx,
-                        cy
-                    )
-
-                var delta =
-                    currentAngle - lastAngle
-
-                // Correct crossing of -180 / +180.
-                if (delta > 180.0) {
-                    delta -= 360.0
-                }
-
-                if (delta < -180.0) {
-                    delta += 360.0
-                }
-
-                lastAngle = currentAngle
-
-                // Only ignore extremely tiny touch noise.
-                if (abs(delta) > noiseThreshold) {
-
-                    // DIRECT 1:1 ROTATION
-                    onRotate?.invoke(delta)
-                }
-
-                invalidate()
+                setFrequencyFromTouch(
+                    event.x,
+                    event.y,
+                    cx,
+                    cy
+                )
 
                 return true
             }
+
+            // =================================================
+            // RELEASE
+            // =================================================
 
             MotionEvent.ACTION_UP -> {
 
@@ -306,6 +290,10 @@ class DialView @JvmOverloads constructor(
 
                 return true
             }
+
+            // =================================================
+            // CANCEL
+            // =================================================
 
             MotionEvent.ACTION_CANCEL -> {
 
@@ -322,23 +310,74 @@ class DialView @JvmOverloads constructor(
         return true
     }
 
-    override fun performClick(): Boolean {
-        super.performClick()
-        return true
-    }
-
-    private fun angleFromPoint(
+    /**
+     * Converts the finger's position directly into frequency.
+     *
+     * -135° -> 1 Hz
+     * +135° -> 20,000 Hz
+     */
+    private fun setFrequencyFromTouch(
         x: Float,
         y: Float,
         cx: Float,
         cy: Float
-    ): Double {
+    ) {
 
-        return Math.toDegrees(
-            atan2(
-                (y - cy).toDouble(),
-                (x - cx).toDouble()
+        var angle =
+            Math.toDegrees(
+                atan2(
+                    (y - cy).toDouble(),
+                    (x - cx).toDouble()
+                )
             )
+
+        // Convert angle into the dial's 0..270° range.
+        var relative =
+            angle - startAngle
+
+        while (relative < 0) {
+            relative += 360.0
+        }
+
+        while (relative >= 360.0) {
+            relative -= 360.0
+        }
+
+        // Ignore the large unused 90° section
+        // behind the dial.
+        if (relative > sweepAngle) {
+            return
+        }
+
+        val normalized =
+            (
+                relative / sweepAngle
+            ).coerceIn(
+                0.0,
+                1.0
+            )
+
+        val frequency =
+            minFrequency +
+                    normalized *
+                    (
+                        maxFrequency -
+                                minFrequency
+                    )
+
+        // Send the new absolute frequency
+        // to MainActivity.
+        onRotate?.invoke(
+            frequency - currentFrequency
         )
+
+        currentFrequency = frequency
+
+        invalidate()
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 }
