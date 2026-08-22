@@ -4,33 +4,13 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#070B08">
+    android:background="#101010">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
-
-        <!-- ================================================= -->
-        <!-- HEADER -->
-        <!-- ================================================= -->
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="SIGNAL DECK"
-            android:textColor="#4DFFA0"
-            android:textSize="30sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="NATIVE USB SCOPE PANEL"
-            android:textColor="#6F9A80"
-            android:textSize="11sp"
-            android:layout_marginBottom="12dp" />
+        android:padding="12dp">
 
         <!-- ================================================= -->
         <!-- CONNECTION -->
@@ -39,26 +19,23 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="#0D150E"
-            android:padding="12dp"
-            android:layout_marginBottom="12dp"
-            android:gravity="center_vertical">
+            android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/connStatus"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="Not connected"
-                android:textColor="#FF5A5A" />
+                android:text="Disconnected"
+                android:textColor="#FFFFFF"
+                android:textSize="18sp"
+                android:padding="10dp"/>
 
             <Button
                 android:id="@+id/connectBtn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Connect" />
-
+                android:text="Connect"/>
         </LinearLayout>
 
         <!-- ================================================= -->
@@ -68,42 +45,33 @@
         <com.signaldeck.scope.ScopeView
             android:id="@+id/scopeView"
             android:layout_width="match_parent"
-            android:layout_height="240dp"
-            android:layout_marginBottom="12dp" />
+            android:layout_height="260dp"
+            android:layout_marginTop="10dp"/>
+
+        <!-- ================================================= -->
+        <!-- TARGET -->
+        <!-- ================================================= -->
 
         <TextView
-            android:id="@+id/rVoltage"
+            android:id="@+id/rTarget"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Voltage: -- (no real capture yet)"
-            android:textColor="#4DFFA0"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="12dp" />
-
-        <!-- ================================================= -->
-        <!-- FREQUENCY CONTROL -->
-        <!-- ================================================= -->
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="FREQUENCY CONTROL"
-            android:textColor="#6F9A80"
-            android:textSize="10.5sp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="4dp" />
+            android:text="Target: 1000.00 Hz"
+            android:textColor="#AAAAAA"
+            android:textSize="16sp"
+            android:gravity="center"
+            android:padding="4dp"/>
 
         <TextView
             android:id="@+id/rTargetBig"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="1000.00 Hz"
-            android:textColor="#4DFFA0"
-            android:textSize="26sp"
+            android:textColor="#FFFFFF"
+            android:textSize="30sp"
             android:textStyle="bold"
             android:gravity="center"
-            android:layout_marginBottom="8dp" />
+            android:padding="6dp"/>
 
         <!-- ================================================= -->
         <!-- DIAL -->
@@ -111,38 +79,32 @@
 
         <com.signaldeck.scope.DialView
             android:id="@+id/dialView"
-            android:layout_width="220dp"
-            android:layout_height="220dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="10dp" />
+            android:layout_width="match_parent"
+            android:layout_height="300dp"
+            android:layout_marginTop="8dp"/>
 
         <!-- ================================================= -->
-        <!-- UP / DOWN HOLD BUTTONS -->
+        <!-- DIAL MODES -->
         <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginBottom="8dp">
+            android:orientation="horizontal">
 
             <Button
-                android:id="@+id/downFreqBtn"
+                android:id="@+id/coarseModeBtn"
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="▼"
-                android:textSize="26sp" />
+                android:text="COARSE"/>
 
             <Button
-                android:id="@+id/upFreqBtn"
+                android:id="@+id/fineModeBtn"
                 android:layout_width="0dp"
-                android:layout_height="60dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="▲"
-                android:textSize="26sp" />
-
+                android:text="FINE"/>
         </LinearLayout>
 
         <!-- ================================================= -->
@@ -150,158 +112,139 @@
         <!-- ================================================= -->
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="ARROW SPEED"
-            android:textColor="#6F9A80"
-            android:textSize="10.5sp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="4dp" />
+            android:textColor="#AAAAAA"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:paddingTop="8dp"/>
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center"
-            android:layout_marginBottom="10dp">
+            android:orientation="horizontal">
 
             <Button
                 android:id="@+id/speed1xBtn"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="1×"
-                android:textSize="14sp" />
+                android:text="1×"/>
 
             <Button
                 android:id="@+id/speed2xBtn"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="2×"
-                android:textSize="14sp" />
-
+                android:text="2×"/>
         </LinearLayout>
 
         <!-- ================================================= -->
-        <!-- COARSE / FINE -->
+        <!-- UP / DOWN -->
         <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:gravity="center"
+            android:paddingTop="8dp">
 
             <Button
-                android:id="@+id/coarseModeBtn"
+                android:id="@+id/downFreqBtn"
                 android:layout_width="0dp"
+                android:layout_height="65dp"
                 android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Coarse"
-                android:textSize="12sp" />
+                android:text="▼"
+                android:textSize="28sp"/>
 
             <Button
-                android:id="@+id/fineModeBtn"
+                android:id="@+id/upFreqBtn"
                 android:layout_width="0dp"
+                android:layout_height="65dp"
                 android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="Fine"
-                android:textSize="12sp" />
-
+                android:text="▲"
+                android:textSize="28sp"/>
         </LinearLayout>
 
         <!-- ================================================= -->
-        <!-- EXACT NUDGE BUTTONS -->
+        <!-- EXACT NUDGE -->
         <!-- ================================================= -->
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
+            android:orientation="horizontal">
 
             <Button
                 android:id="@+id/minus1Btn"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="−1 Hz"
-                android:textSize="12sp" />
+                android:layout_weight="1"
+                android:text="-1 Hz"/>
 
             <Button
                 android:id="@+id/minus01Btn"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="−0.1 Hz"
-                android:textSize="11sp" />
+                android:layout_weight="1"
+                android:text="-0.1 Hz"/>
 
             <Button
                 android:id="@+id/plus01Btn"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="+0.1 Hz"
-                android:textSize="11sp" />
+                android:layout_weight="1"
+                android:text="+0.1 Hz"/>
 
             <Button
                 android:id="@+id/plus1Btn"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="+1 Hz"
-                android:textSize="12sp" />
-
+                android:layout_weight="1"
+                android:text="+1 Hz"/>
         </LinearLayout>
 
         <!-- ================================================= -->
-        <!-- STATUS -->
+        <!-- MEASUREMENTS -->
         <!-- ================================================= -->
+
+        <TextView
+            android:id="@+id/rMeasured"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Measured: --"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:padding="6dp"/>
+
+        <TextView
+            android:id="@+id/rDuty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Duty: --"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:padding="6dp"/>
 
         <TextView
             android:id="@+id/rRate"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Frame rate: --"
-            android:textColor="#6F9A80"
-            android:textSize="10.5sp"
-            android:layout_marginBottom="12dp" />
+            android:text="Rate: --"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:padding="6dp"/>
 
-        <GridLayout
+        <TextView
+            android:id="@+id/rVoltage"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="3"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:id="@+id/rTarget"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:layout_height="wrap_content"
-                android:text="Target: --"
-                android:textColor="#4DFFA0"
-                android:padding="6dp" />
-
-            <TextView
-                android:id="@+id/rMeasured"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:layout_height="wrap_content"
-                android:text="Measured: --"
-                android:textColor="#4DFFA0"
-                android:padding="6dp" />
-
-            <TextView
-                android:id="@+id/rDuty"
-                android:layout_width="0dp"
-                android:layout_columnWeight="1"
-                android:layout_height="wrap_content"
-                android:text="Duty: --"
-                android:textColor="#4DFFA0"
-                android:padding="6dp" />
-
-        </GridLayout>
+            android:text="Voltage: --"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:padding="6dp"/>
 
         <!-- ================================================= -->
         <!-- CAPTURE -->
@@ -310,23 +253,21 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:layout_marginBottom="8dp">
+            android:orientation="horizontal">
 
             <Button
                 android:id="@+id/liveCaptureBtn"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="Start Live Capture" />
+                android:layout_weight="1"
+                android:text="Start Live Capture"/>
 
             <Button
                 android:id="@+id/reconBtn"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="Reconstructed" />
-
+                android:layout_weight="1"
+                android:text="Reconstructed"/>
         </LinearLayout>
 
         <!-- ================================================= -->
@@ -337,65 +278,44 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginBottom="12dp">
+            android:paddingTop="8dp">
 
             <EditText
                 android:id="@+id/cmdInput"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:hint="type command, e.g. D"
-                android:textColor="#BFE8CD"
-                android:textColorHint="#6F9A80"
-                android:inputType="text"
-                android:imeOptions="actionSend" />
+                android:layout_weight="1"
+                android:hint="Command"
+                android:textColor="#FFFFFF"
+                android:textColorHint="#777777"
+                android:singleLine="true"/>
 
             <Button
                 android:id="@+id/sendBtn"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Send" />
-
+                android:text="SEND"/>
         </LinearLayout>
 
         <!-- ================================================= -->
         <!-- LOG -->
         <!-- ================================================= -->
 
-        <LinearLayout
+        <Button
+            android:id="@+id/clearLogBtn"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="4dp">
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="LOG"
-                android:textColor="#6F9A80"
-                android:textSize="10.5sp" />
-
-            <Button
-                android:id="@+id/clearLogBtn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Clear Log"
-                android:textSize="11sp" />
-
-        </LinearLayout>
+            android:text="Clear Log"/>
 
         <TextView
             android:id="@+id/logView"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:minHeight="200dp"
-            android:background="#0D150E"
-            android:padding="10dp"
-            android:textColor="#4DFFA0"
-            android:fontFamily="monospace"
-            android:textSize="11sp" />
+            android:layout_height="220dp"
+            android:background="#080808"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:padding="8dp"
+            android:scrollbars="vertical"/>
 
     </LinearLayout>
 
