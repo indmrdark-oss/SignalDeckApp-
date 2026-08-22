@@ -13,8 +13,8 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.text.SpannableString
 import android.text.Spannable
+import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 import android.view.MotionEvent
@@ -22,6 +22,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
@@ -93,7 +94,6 @@ class MainActivity : AppCompatActivity() {
         3000.0 / 360.0
 
     private var pendingSend = false
-
     private val sendThrottleMs = 60L
 
     // =========================================================
@@ -103,15 +103,13 @@ class MainActivity : AppCompatActivity() {
     private var freqRepeatDirection = 0
 
     /*
-     * 1 Hz per step.
+     * Hold arrow:
      *
-     * Initial delay:
-     * 250 ms
+     * First change happens immediately.
+     * Then wait 300 ms.
+     * Then change by 1 Hz every 100 ms.
      *
-     * Then:
-     * 100 ms per step
-     *
-     * ≈ 10 Hz/second.
+     * = about 10 Hz/second.
      */
     private val freqRepeatRunnable =
         object : Runnable {
@@ -121,22 +119,7 @@ class MainActivity : AppCompatActivity() {
                 if (freqRepeatDirection == 0)
                     return
 
-                dialFrequency =
-                    (
-                        dialFrequency +
-                                freqRepeatDirection * 1.0
-                        ).coerceIn(
-                            F_MIN,
-                            F_MAX
-                        )
-
-                updateDialDisplay()
-
-                serial?.writeLine(
-                    "F%.2f".format(
-                        dialFrequency
-                    )
-                )
+                changeFrequency(1.0 * freqRepeatDirection)
 
                 uiHandler.postDelayed(
                     this,
@@ -178,11 +161,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (pendingSend) {
 
-                    serial?.writeLine(
-                        "F%.2f".format(
-                            dialFrequency
-                        )
-                    )
+                    sendFrequency()
 
                     pendingSend = false
                 }
@@ -215,17 +194,16 @@ class MainActivity : AppCompatActivity() {
                             synchronized(this) {
 
                                 val device: UsbDevice? =
-                                    if (
-                                        Build.VERSION.SDK_INT >= 33
-                                    ) {
+                                    if (Build.VERSION.SDK_INT >= 33) {
+
                                         intent.getParcelableExtra(
                                             UsbManager.EXTRA_DEVICE,
                                             UsbDevice::class.java
                                         )
+
                                     } else {
-                                        @Suppress(
-                                            "DEPRECATION"
-                                        )
+
+                                        @Suppress("DEPRECATION")
                                         intent.getParcelableExtra(
                                             UsbManager.EXTRA_DEVICE
                                         )
@@ -241,8 +219,11 @@ class MainActivity : AppCompatActivity() {
                                     granted &&
                                     device != null
                                 ) {
+
                                     connectToDevice(device)
+
                                 } else {
+
                                     appendLog(
                                         "Permission denied for USB device."
                                     )
@@ -270,8 +251,7 @@ class MainActivity : AppCompatActivity() {
                 } catch (e: Exception) {
 
                     appendLog(
-                        "CRASH in usbReceiver: " +
-                                e.toString()
+                        "CRASH in usbReceiver: ${e}"
                     )
                 }
             }
@@ -408,23 +388,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // CONNECT BUTTON
+        // CONNECT
         // =====================================================
 
         connectBtn.setOnClickListener {
 
             try {
 
-                if (serial != null)
+                if (serial != null) {
                     disconnect()
-                else
+                } else {
                     requestDevice()
+                }
 
             } catch (e: Exception) {
 
                 appendLog(
-                    "CRASH on Connect tap: " +
-                            e.toString()
+                    "CRASH on Connect tap: $e"
                 )
             }
         }
@@ -508,7 +488,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // DIAL
+        // ROTARY DIAL
         // =====================================================
 
         dialView.onRotate =
@@ -520,11 +500,11 @@ class MainActivity : AppCompatActivity() {
                 dialFrequency =
                     (
                         dialFrequency +
-                                deltaHz
-                        ).coerceIn(
-                            F_MIN,
-                            F_MAX
-                        )
+                            deltaHz
+                    ).coerceIn(
+                        F_MIN,
+                        F_MAX
+                    )
 
                 updateDialDisplay()
 
@@ -532,7 +512,7 @@ class MainActivity : AppCompatActivity() {
             }
 
         // =====================================================
-        // COARSE / FINE
+        // COARSE MODE
         // =====================================================
 
         coarseModeBtn.setOnClickListener {
@@ -541,10 +521,13 @@ class MainActivity : AppCompatActivity() {
                 3000.0 / 360.0
 
             appendLog(
-                "Dial: COARSE mode " +
-                        "(1 turn ≈ 3000 Hz)"
+                "Dial: COARSE mode — 1 rotation ≈ 3000 Hz"
             )
         }
+
+        // =====================================================
+        // FINE MODE
+        // =====================================================
 
         fineModeBtn.setOnClickListener {
 
@@ -552,13 +535,12 @@ class MainActivity : AppCompatActivity() {
                 60.0 / 360.0
 
             appendLog(
-                "Dial: FINE mode " +
-                        "(1 turn ≈ 60 Hz)"
+                "Dial: FINE mode — 1 rotation ≈ 60 Hz"
             )
         }
 
         // =====================================================
-        // HOLD DOWN ARROW
+        // DOWN ARROW — HOLD
         // =====================================================
 
         downFreqBtn.setOnTouchListener {
@@ -570,24 +552,10 @@ class MainActivity : AppCompatActivity() {
 
                     freqRepeatDirection = -1
 
-                    // Immediate first step.
-                    dialFrequency =
-                        (
-                            dialFrequency - 1.0
-                            ).coerceIn(
-                                F_MIN,
-                                F_MAX
-                            )
+                    // Immediate first step
+                    changeFrequency(-1.0)
 
-                    updateDialDisplay()
-
-                    serial?.writeLine(
-                        "F%.2f".format(
-                            dialFrequency
-                        )
-                    )
-
-                    freqRepeatHandlerStart()
+                    startFrequencyRepeat()
 
                     true
                 }
@@ -605,7 +573,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =====================================================
-        // HOLD UP ARROW
+        // UP ARROW — HOLD
         // =====================================================
 
         upFreqBtn.setOnTouchListener {
@@ -617,24 +585,10 @@ class MainActivity : AppCompatActivity() {
 
                     freqRepeatDirection = 1
 
-                    // Immediate first step.
-                    dialFrequency =
-                        (
-                            dialFrequency + 1.0
-                            ).coerceIn(
-                                F_MIN,
-                                F_MAX
-                            )
+                    // Immediate first step
+                    changeFrequency(1.0)
 
-                    updateDialDisplay()
-
-                    serial?.writeLine(
-                        "F%.2f".format(
-                            dialFrequency
-                        )
-                    )
-
-                    freqRepeatHandlerStart()
+                    startFrequencyRepeat()
 
                     true
                 }
@@ -656,19 +610,19 @@ class MainActivity : AppCompatActivity() {
         // =====================================================
 
         minus1Btn.setOnClickListener {
-            nudgeFrequency(-1.0)
+            changeFrequency(-1.0)
         }
 
         minus01Btn.setOnClickListener {
-            nudgeFrequency(-0.1)
+            changeFrequency(-0.1)
         }
 
         plus01Btn.setOnClickListener {
-            nudgeFrequency(0.1)
+            changeFrequency(0.1)
         }
 
         plus1Btn.setOnClickListener {
-            nudgeFrequency(1.0)
+            changeFrequency(1.0)
         }
 
         // =====================================================
@@ -683,24 +637,64 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // START HOLD REPEAT
+    // FREQUENCY CHANGE
     // =========================================================
 
-    private fun freqRepeatHandlerStart() {
+    private fun changeFrequency(
+        delta: Double
+    ) {
+
+        dialFrequency =
+            (
+                dialFrequency + delta
+            ).coerceIn(
+                F_MIN,
+                F_MAX
+            )
+
+        updateDialDisplay()
+
+        sendFrequency()
+    }
+
+    // =========================================================
+    // SEND FREQUENCY TO ARDUINO
+    // =========================================================
+
+    private fun sendFrequency() {
+
+        val command =
+            String.format(
+                Locale.US,
+                "F%.2f",
+                dialFrequency
+            )
+
+        serial?.writeLine(command)
+    }
+
+    // =========================================================
+    // START ARROW REPEAT
+    // =========================================================
+
+    private fun startFrequencyRepeat() {
 
         uiHandler.removeCallbacks(
             freqRepeatRunnable
         )
 
-        // 250ms before continuous movement begins.
+        /*
+         * 300 ms delay before repeating.
+         * This prevents accidental rapid jumps.
+         */
         uiHandler.postDelayed(
             freqRepeatRunnable,
-            250L
+            300L
         )
     }
 
     // =========================================================
-    // STOP HOLD REPEAT
+    // STOP ARROW REPEAT
     // =========================================================
 
     private fun stopFrequencyRepeat() {
@@ -713,38 +707,22 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // NUDGE
-    // =========================================================
-
-    private fun nudgeFrequency(
-        deltaHz: Double
-    ) {
-
-        dialFrequency =
-            (
-                dialFrequency + deltaHz
-                ).coerceIn(
-                    F_MIN,
-                    F_MAX
-                )
-
-        updateDialDisplay()
-
-        serial?.writeLine(
-            "F%.2f".format(
-                dialFrequency
-            )
-        )
-    }
-
-    // =========================================================
     // DIAL DISPLAY
     // =========================================================
 
     private fun updateDialDisplay() {
 
         rTargetBig.text =
-            "%.2f Hz".format(
+            String.format(
+                Locale.US,
+                "%.2f Hz",
+                dialFrequency
+            )
+
+        rTarget.text =
+            String.format(
+                Locale.US,
+                "Target: %.2f Hz",
                 dialFrequency
             )
     }
@@ -762,8 +740,7 @@ class MainActivity : AppCompatActivity() {
 
             appendLog(
                 "No USB device found. " +
-                        "Check the cable and that " +
-                        "the Arduino is plugged in."
+                    "Check the cable and that Arduino is plugged in."
             )
 
             return
@@ -772,6 +749,45 @@ class MainActivity : AppCompatActivity() {
         val device =
             devices.first()
 
+        /*
+         * Explicitly construct Intent with a String.
+         * This avoids the Kotlin overload ambiguity.
+         */
         val usbPermissionIntent =
-            Intent(
-                
+            Intent(ACTION_USB_PERMISSION).apply {
+                setPackage(packageName)
+            }
+
+        val flags =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                0
+            }
+
+        val permissionIntent =
+            PendingIntent.getBroadcast(
+                this,
+                0,
+                usbPermissionIntent,
+                flags
+            )
+
+        if (
+            usbManager.hasPermission(device)
+        ) {
+
+            connectToDevice(device)
+
+        } else {
+
+            usbManager.requestPermission(
+                device,
+                permissionIntent
+            )
+        }
+    }
+
+    // =========================================================
+    // CONNECT TO ARDUINO
+    // =============
