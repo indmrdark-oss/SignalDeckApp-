@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
+
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -48,6 +49,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Connect" />
+
         </LinearLayout>
 
         <com.signaldeck.scope.ScopeView
@@ -66,7 +68,8 @@
             android:textStyle="bold"
             android:layout_marginBottom="12dp" />
 
-        <!-- ===== FREQUENCY DIAL SECTION ===== -->
+        <!-- FREQUENCY CONTROL -->
+
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -94,17 +97,70 @@
             android:layout_gravity="center_horizontal"
             android:layout_marginBottom="10dp" />
 
+        <!-- COARSE / FINE -->
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:layout_marginBottom="8dp">
 
-            <Button android:id="@+id/coarseModeBtn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="Coarse" android:textSize="12sp" />
-            <Button android:id="@+id/fineModeBtn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="Fine" android:textSize="12sp" />
+            <Button
+                android:id="@+id/coarseModeBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Coarse"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/fineModeBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Fine"
+                android:textSize="12sp" />
+
         </LinearLayout>
+
+        <!-- HOLD ARROW CONTROLS -->
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/downFreqBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="▼"
+                android:textSize="24sp"
+                android:longClickable="false" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text=" HOLD TO CHANGE "
+                android:textColor="#6F9A80"
+                android:textSize="10sp"
+                android:gravity="center" />
+
+            <Button
+                android:id="@+id/upFreqBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="▲"
+                android:textSize="24sp"
+                android:longClickable="false" />
+
+        </LinearLayout>
+
+        <!-- EXACT NUDGE BUTTONS -->
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -112,16 +168,41 @@
             android:orientation="horizontal"
             android:layout_marginBottom="12dp">
 
-            <Button android:id="@+id/minus1Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="−1 Hz" android:textSize="12sp" />
-            <Button android:id="@+id/minus01Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="−0.1 Hz" android:textSize="11sp" />
-            <Button android:id="@+id/plus01Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="+0.1 Hz" android:textSize="11sp" />
-            <Button android:id="@+id/plus1Btn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="+1 Hz" android:textSize="12sp" />
+            <Button
+                android:id="@+id/minus1Btn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="−1 Hz"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/minus01Btn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="−0.1 Hz"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/plus01Btn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="+0.1 Hz"
+                android:textSize="11sp" />
+
+            <Button
+                android:id="@+id/plus1Btn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="+1 Hz"
+                android:textSize="12sp" />
+
         </LinearLayout>
-        <!-- ===== END DIAL SECTION ===== -->
+
+        <!-- END FREQUENCY CONTROL -->
 
         <TextView
             android:id="@+id/rRate"
@@ -138,12 +219,33 @@
             android:columnCount="3"
             android:layout_marginBottom="12dp">
 
-            <TextView android:id="@+id/rTarget" android:layout_width="0dp" android:layout_columnWeight="1"
-                android:layout_height="wrap_content" android:text="Target: --" android:textColor="#4DFFA0" android:padding="6dp" />
-            <TextView android:id="@+id/rMeasured" android:layout_width="0dp" android:layout_columnWeight="1"
-                android:layout_height="wrap_content" android:text="Measured: --" android:textColor="#4DFFA0" android:padding="6dp" />
-            <TextView android:id="@+id/rDuty" android:layout_width="0dp" android:layout_columnWeight="1"
-                android:layout_height="wrap_content" android:text="Duty: --" android:textColor="#4DFFA0" android:padding="6dp" />
+            <TextView
+                android:id="@+id/rTarget"
+                android:layout_width="0dp"
+                android:layout_columnWeight="1"
+                android:layout_height="wrap_content"
+                android:text="Target: --"
+                android:textColor="#4DFFA0"
+                android:padding="6dp" />
+
+            <TextView
+                android:id="@+id/rMeasured"
+                android:layout_width="0dp"
+                android:layout_columnWeight="1"
+                android:layout_height="wrap_content"
+                android:text="Measured: --"
+                android:textColor="#4DFFA0"
+                android:padding="6dp" />
+
+            <TextView
+                android:id="@+id/rDuty"
+                android:layout_width="0dp"
+                android:layout_columnWeight="1"
+                android:layout_height="wrap_content"
+                android:text="Duty: --"
+                android:textColor="#4DFFA0"
+                android:padding="6dp" />
+
         </GridLayout>
 
         <LinearLayout
@@ -152,10 +254,20 @@
             android:orientation="horizontal"
             android:layout_marginBottom="8dp">
 
-            <Button android:id="@+id/liveCaptureBtn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="Start Live Capture" />
-            <Button android:id="@+id/reconBtn" android:layout_width="0dp" android:layout_weight="1"
-                android:layout_height="wrap_content" android:text="Reconstructed" />
+            <Button
+                android:id="@+id/liveCaptureBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Start Live Capture" />
+
+            <Button
+                android:id="@+id/reconBtn"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="Reconstructed" />
+
         </LinearLayout>
 
         <LinearLayout
@@ -180,6 +292,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Send" />
+
         </LinearLayout>
 
         <LinearLayout
@@ -203,6 +316,7 @@
                 android:layout_height="wrap_content"
                 android:text="Clear Log"
                 android:textSize="11sp" />
+
         </LinearLayout>
 
         <TextView
@@ -217,4 +331,5 @@
             android:textSize="11sp" />
 
     </LinearLayout>
+
 </ScrollView>
