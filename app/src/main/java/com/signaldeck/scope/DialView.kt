@@ -36,21 +36,14 @@ class DialView @JvmOverloads constructor(
 
         super.onDraw(canvas)
 
-        val cx =
-            width / 2f
-
-        val cy =
-            height / 2f
+        val cx = width / 2f
+        val cy = height / 2f
 
         val radius =
             min(width, height) * 0.38f
 
-        // Dial body
-        paint.style =
-            Paint.Style.FILL
-
-        paint.color =
-            0xFF181818.toInt()
+        paint.style = Paint.Style.FILL
+        paint.color = 0xFF181818.toInt()
 
         canvas.drawCircle(
             cx,
@@ -59,15 +52,9 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        // Outer ring
-        paint.style =
-            Paint.Style.STROKE
-
-        paint.strokeWidth =
-            6f
-
-        paint.color =
-            0xFF555555.toInt()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 6f
+        paint.color = 0xFF555555.toInt()
 
         canvas.drawCircle(
             cx,
@@ -76,17 +63,13 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        // 1 Hz reference
-        val startAngle =
-            -135.0
+        val startAngle = -135.0
 
         val referenceRadius =
             radius * 0.90f
 
         val refRad =
-            Math.toRadians(
-                startAngle
-            )
+            Math.toRadians(startAngle)
 
         val x1 =
             cx +
@@ -108,11 +91,8 @@ class DialView @JvmOverloads constructor(
                 sin(refRad).toFloat() *
                 referenceRadius
 
-        paint.strokeWidth =
-            5f
-
-        paint.color =
-            0xFFFFFFFF.toInt()
+        paint.strokeWidth = 5f
+        paint.color = 0xFFFFFFFF.toInt()
 
         canvas.drawLine(
             x1,
@@ -122,18 +102,10 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        // 1 Hz label
-        paint.style =
-            Paint.Style.FILL
-
-        paint.textSize =
-            radius * 0.14f
-
-        paint.typeface =
-            Typeface.DEFAULT_BOLD
-
-        paint.textAlign =
-            Paint.Align.CENTER
+        paint.style = Paint.Style.FILL
+        paint.textSize = radius * 0.14f
+        paint.typeface = Typeface.DEFAULT_BOLD
+        paint.textAlign = Paint.Align.CENTER
 
         canvas.drawText(
             "1 Hz",
@@ -146,7 +118,6 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        // Frequency position
         val normalized =
             (
                 currentFrequency -
@@ -177,11 +148,8 @@ class DialView @JvmOverloads constructor(
                 sin(rad).toFloat() *
                 needleLength
 
-        paint.strokeWidth =
-            8f
-
-        paint.color =
-            0xFFFF4444.toInt()
+        paint.strokeWidth = 8f
+        paint.color = 0xFFFF4444.toInt()
 
         canvas.drawLine(
             cx,
@@ -191,12 +159,8 @@ class DialView @JvmOverloads constructor(
             paint
         )
 
-        // Center
-        paint.style =
-            Paint.Style.FILL
-
-        paint.color =
-            0xFFFFFFFF.toInt()
+        paint.style = Paint.Style.FILL
+        paint.color = 0xFFFFFFFF.toInt()
 
         canvas.drawCircle(
             cx,
@@ -210,11 +174,8 @@ class DialView @JvmOverloads constructor(
         event: MotionEvent
     ): Boolean {
 
-        val cx =
-            width / 2f
-
-        val cy =
-            height / 2f
+        val cx = width / 2f
+        val cy = height / 2f
 
         when (event.actionMasked) {
 
@@ -250,20 +211,17 @@ class DialView @JvmOverloads constructor(
                 var delta =
                     angle - lastAngle
 
-                if (delta > 180) {
-                    delta -= 360
+                if (delta > 180.0) {
+                    delta -= 360.0
                 }
 
-                if (delta < -180) {
-                    delta += 360
+                if (delta < -180.0) {
+                    delta += 360.0
                 }
 
-                lastAngle =
-                    angle
+                lastAngle = angle
 
-                onRotate?.invoke(
-                    delta
-                )
+                onRotate?.invoke(delta)
 
                 invalidate()
 
