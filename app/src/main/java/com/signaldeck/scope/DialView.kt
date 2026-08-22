@@ -7,6 +7,7 @@ import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.min
@@ -33,11 +34,8 @@ class DialView @JvmOverloads constructor(
     private val minFrequency = 1.0
     private val maxFrequency = 20000.0
 
-    // Prevent tiny finger noise from making the dial jitter.
-    private var accumulatedDegrees = 0.0
-
-    // Minimum angular movement before sending a frequency update.
-    private val angleThreshold = 0.15
+    // Very small dead-zone only for touch noise.
+    private val noiseThreshold = 0.03
 
     override fun onDraw(canvas: Canvas) {
 
@@ -45,7 +43,6 @@ class DialView @JvmOverloads constructor(
 
         val cx = width / 2f
         val cy = height / 2f
-
         val radius = min(width, height) * 0.38f
 
         // =====================================================
@@ -78,7 +75,7 @@ class DialView @JvmOverloads constructor(
         )
 
         // =====================================================
-        // SCALE
+        // TICKS
         // =====================================================
 
         val startAngle = -135.0
@@ -93,38 +90,28 @@ class DialView @JvmOverloads constructor(
                 startAngle +
                         sweepAngle * (i / 20.0)
 
-            val rad =
-                Math.toRadians(angle)
+            val rad = Math.toRadians(angle)
 
-            val outer =
-                radius * 0.91f
+            val outer = radius * 0.91f
 
             val inner =
                 if (i % 5 == 0) {
-                    radius * 0.78f
+                    radius * 0.77f
                 } else {
                     radius * 0.84f
                 }
 
             val x1 =
-                cx +
-                        cos(rad).toFloat() *
-                        inner
+                cx + cos(rad).toFloat() * inner
 
             val y1 =
-                cy +
-                        sin(rad).toFloat() *
-                        inner
+                cy + sin(rad).toFloat() * inner
 
             val x2 =
-                cx +
-                        cos(rad).toFloat() *
-                        outer
+                cx + cos(rad).toFloat() * outer
 
             val y2 =
-                cy +
-                        sin(rad).toFloat() *
-                        outer
+                cy + sin(rad).toFloat() * outer
 
             canvas.drawLine(
                 x1,
@@ -145,31 +132,11 @@ class DialView @JvmOverloads constructor(
         paint.strokeWidth = 5f
         paint.color = 0xFFFFFFFF.toInt()
 
-        val refX1 =
-            cx +
-                    cos(refRad).toFloat() *
-                    (radius * 0.72f)
-
-        val refY1 =
-            cy +
-                    sin(refRad).toFloat() *
-                    (radius * 0.72f)
-
-        val refX2 =
-            cx +
-                    cos(refRad).toFloat() *
-                    (radius * 0.90f)
-
-        val refY2 =
-            cy +
-                    sin(refRad).toFloat() *
-                    (radius * 0.90f)
-
         canvas.drawLine(
-            refX1,
-            refY1,
-            refX2,
-            refY2,
+            cx + cos(refRad).toFloat() * radius * 0.72f,
+            cy + sin(refRad).toFloat() * radius * 0.72f,
+            cx + cos(refRad).toFloat() * radius * 0.90f,
+            cy + sin(refRad).toFloat() * radius * 0.90f,
             paint
         )
 
@@ -185,17 +152,13 @@ class DialView @JvmOverloads constructor(
 
         canvas.drawText(
             "1 Hz",
-            cx +
-                    cos(refRad).toFloat() *
-                    (radius * 0.58f),
-            cy +
-                    sin(refRad).toFloat() *
-                    (radius * 0.58f),
+            cx + cos(refRad).toFloat() * radius * 0.58f,
+            cy + sin(refRad).toFloat() * radius * 0.58f,
             paint
         )
 
         // =====================================================
-        // FREQUENCY NEEDLE
+        // NEEDLE
         // =====================================================
 
         val normalized =
@@ -210,21 +173,17 @@ class DialView @JvmOverloads constructor(
             startAngle +
                     normalized * sweepAngle
 
-        val needleRad =
+        val rad =
             Math.toRadians(needleAngle)
 
         val needleLength =
             radius * 0.68f
 
         val nx =
-            cx +
-                    cos(needleRad).toFloat() *
-                    needleLength
+            cx + cos(rad).toFloat() * needleLength
 
         val ny =
-            cy +
-                    sin(needleRad).toFloat() *
-                    needleLength
+            cy + sin(rad).toFloat() * needleLength
 
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = 8f
@@ -267,7 +226,8 @@ class DialView @JvmOverloads constructor(
         event: MotionEvent
     ): Boolean {
 
-        val parentView = parent
+        val cx = width / 2f
+        val cy = height / 2f
 
         when (event.actionMasked) {
 
@@ -275,20 +235,19 @@ class DialView @JvmOverloads constructor(
 
                 touching = true
 
-                accumulatedDegrees = 0.0
-
                 lastAngle =
                     angleFromPoint(
                         event.x,
                         event.y,
-                        width / 2f,
-                        height / 2f
+                        cx,
+                        cy
                     )
 
-                // VERY IMPORTANT:
-                // Stop the ScrollView from stealing
-                // the finger while rotating the dial.
-                parentView?.requestDisallowInterceptTouchEvent(true)
+                // Prevent ScrollView from stealing
+                // the touch while using the dial.
+                parent?.requestDisallowInterceptTouchEvent(
+                    true
+                )
 
                 performClick()
 
@@ -301,9 +260,6 @@ class DialView @JvmOverloads constructor(
                     return true
                 }
 
-                val cx = width / 2f
-                val cy = height / 2f
-
                 val currentAngle =
                     angleFromPoint(
                         event.x,
@@ -315,7 +271,7 @@ class DialView @JvmOverloads constructor(
                 var delta =
                     currentAngle - lastAngle
 
-                // Handle crossing -180/+180.
+                // Correct crossing of -180 / +180.
                 if (delta > 180.0) {
                     delta -= 360.0
                 }
@@ -326,23 +282,11 @@ class DialView @JvmOverloads constructor(
 
                 lastAngle = currentAngle
 
-                accumulatedDegrees += delta
+                // Only ignore extremely tiny touch noise.
+                if (abs(delta) > noiseThreshold) {
 
-                // Only send meaningful movements.
-                if (
-                    kotlin.math.abs(
-                        accumulatedDegrees
-                    ) >= angleThreshold
-                ) {
-
-                    val sendDelta =
-                        accumulatedDegrees
-
-                    accumulatedDegrees = 0.0
-
-                    onRotate?.invoke(
-                        sendDelta
-                    )
+                    // DIRECT 1:1 ROTATION
+                    onRotate?.invoke(delta)
                 }
 
                 invalidate()
@@ -354,9 +298,7 @@ class DialView @JvmOverloads constructor(
 
                 touching = false
 
-                accumulatedDegrees = 0.0
-
-                parentView?.requestDisallowInterceptTouchEvent(
+                parent?.requestDisallowInterceptTouchEvent(
                     false
                 )
 
@@ -369,9 +311,7 @@ class DialView @JvmOverloads constructor(
 
                 touching = false
 
-                accumulatedDegrees = 0.0
-
-                parentView?.requestDisallowInterceptTouchEvent(
+                parent?.requestDisallowInterceptTouchEvent(
                     false
                 )
 
