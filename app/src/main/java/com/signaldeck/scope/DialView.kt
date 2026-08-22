@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
@@ -47,11 +48,25 @@ class DialView @JvmOverloads constructor(
         isAntiAlias = true
     }
 
+    // Fixed 1 Hz reference marker
+    private val referencePaint = Paint().apply {
+        color = Color.WHITE
+        strokeWidth = 5f
+        isAntiAlias = true
+    }
+
+    private val referenceTextPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 22f
+        textAlign = Paint.Align.CENTER
+        isAntiAlias = true
+        typeface = Typeface.DEFAULT_BOLD
+    }
+
     var onRotate: ((deltaDegrees: Float) -> Unit)? = null
 
     private var lastAngle = 0f
     private var visualRotation = 0f
-    private var touchingDial = false
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
 
@@ -68,25 +83,30 @@ class DialView @JvmOverloads constructor(
         when (event.actionMasked) {
 
             MotionEvent.ACTION_DOWN -> {
-                // Stop the ScrollView from stealing the gesture.
-                parent.requestDisallowInterceptTouchEvent(true)
 
-                touchingDial = true
                 lastAngle = angle
+
+                // Prevent the ScrollView from stealing the dial gesture.
+                parent?.requestDisallowInterceptTouchEvent(true)
 
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
-                if (!touchingDial) return true
 
                 var delta = angle - lastAngle
 
-                // Correct the jump when crossing -180/+180 degrees.
-                if (delta > 180f) delta -= 360f
-                if (delta < -180f) delta += 360f
+                // Handle crossing the -180/+180 boundary.
+                if (delta > 180f) {
+                    delta -= 360f
+                }
+
+                if (delta < -180f) {
+                    delta += 360f
+                }
 
                 lastAngle = angle
+
                 visualRotation += delta
 
                 invalidate()
@@ -98,12 +118,8 @@ class DialView @JvmOverloads constructor(
 
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL -> {
-                touchingDial = false
 
-                // Give scrolling back to the ScrollView.
-                parent.requestDisallowInterceptTouchEvent(false)
-
-                performClick()
+                parent?.requestDisallowInterceptTouchEvent(false)
 
                 return true
             }
@@ -112,34 +128,58 @@ class DialView @JvmOverloads constructor(
         return true
     }
 
-    override fun performClick(): Boolean {
-        super.performClick()
-        return true
-    }
-
     override fun onDraw(canvas: Canvas) {
+
+        super.onDraw(canvas)
 
         val cx = width / 2f
         val cy = height / 2f
 
-        val radius = (minOf(width, height) / 2f) - 12f
+        val radius =
+            (minOf(width, height) / 2f) - 12f
 
-        canvas.drawCircle(cx, cy, radius, ringPaint)
-        canvas.drawCircle(cx, cy, radius, ringBorderPaint)
+        // =====================================================
+        // MAIN DIAL
+        // =====================================================
 
-        // 36 tick marks.
+        canvas.drawCircle(
+            cx,
+            cy,
+            radius,
+            ringPaint
+        )
+
+        canvas.drawCircle(
+            cx,
+            cy,
+            radius,
+            ringBorderPaint
+        )
+
+        // =====================================================
+        // TICK MARKS
+        // =====================================================
+
         for (i in 0 until 36) {
 
-            val a = Math.toRadians((i * 10).toDouble())
+            val a = Math.toRadians(
+                (i * 10).toDouble()
+            )
 
             val r1 = radius - 14f
             val r2 = radius - 4f
 
-            val x1 = cx + (r1 * cos(a)).toFloat()
-            val y1 = cy + (r1 * sin(a)).toFloat()
+            val x1 =
+                cx + (r1 * cos(a)).toFloat()
 
-            val x2 = cx + (r2 * cos(a)).toFloat()
-            val y2 = cy + (r2 * sin(a)).toFloat()
+            val y1 =
+                cy + (r1 * sin(a)).toFloat()
+
+            val x2 =
+                cx + (r2 * cos(a)).toFloat()
+
+            val y2 =
+                cy + (r2 * sin(a)).toFloat()
 
             canvas.drawLine(
                 x1,
@@ -150,11 +190,74 @@ class DialView @JvmOverloads constructor(
             )
         }
 
-        // Rotation indicator.
-        val a = Math.toRadians(visualRotation.toDouble())
+        // =====================================================
+        // FIXED 1 Hz REFERENCE
+        // =====================================================
 
-        val ix = cx + (radius - 30f) * cos(a).toFloat()
-        val iy = cy + (radius - 30f) * sin(a).toFloat()
+        // The marker is always at the top.
+        // It does NOT rotate.
+
+        val refAngle =
+            Math.toRadians(-90.0)
+
+        val refInner =
+            radius - 20f
+
+        val refOuter =
+            radius + 2f
+
+        val refX1 =
+            cx +
+                    (refInner * cos(refAngle)).toFloat()
+
+        val refY1 =
+            cy +
+                    (refInner * sin(refAngle)).toFloat()
+
+        val refX2 =
+            cx +
+                    (refOuter * cos(refAngle)).toFloat()
+
+        val refY2 =
+            cy +
+                    (refOuter * sin(refAngle)).toFloat()
+
+        canvas.drawLine(
+            refX1,
+            refY1,
+            refX2,
+            refY2,
+            referencePaint
+        )
+
+        canvas.drawText(
+            "1 Hz",
+            cx,
+            cy - radius + 42f,
+            referenceTextPaint
+        )
+
+        // =====================================================
+        // ROTATING INDICATOR
+        // =====================================================
+
+        val a =
+            Math.toRadians(
+                visualRotation.toDouble()
+            )
+
+        val indicatorRadius =
+            radius - 30f
+
+        val ix =
+            cx +
+                    indicatorRadius *
+                    cos(a).toFloat()
+
+        val iy =
+            cy +
+                    indicatorRadius *
+                    sin(a).toFloat()
 
         canvas.drawLine(
             cx,
