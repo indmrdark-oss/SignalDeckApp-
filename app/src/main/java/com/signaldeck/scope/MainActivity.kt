@@ -35,6 +35,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var liveCaptureBtn: Button
     private lateinit var reconBtn: Button
 
+    private lateinit var zoomInBtn: Button
+    private lateinit var zoomOutBtn: Button
+    private lateinit var resetZoomBtn: Button
+
     private lateinit var cmdInput: EditText
     private lateinit var sendBtn: Button
 
@@ -79,7 +83,6 @@ class MainActivity : AppCompatActivity() {
     private var repeatDirection = 0
     private var liveCapture = false
 
-    // --- Capture parsing state ---
     private var capturing = false
     private var capRate = 0.0
     private var capSamples: IntArray? = null
@@ -95,8 +98,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Actually sends "C" repeatedly while live capture is on - this is
-    // what makes the graph show real data instead of just a toggled label.
+    // Real capture loop - this is what makes "Start Live Capture" actually
+    // pull fresh real frames repeatedly, not just toggle a label.
     private val liveCaptureLoop = object : Runnable {
         override fun run() {
             if (!liveCapture) return
@@ -143,6 +146,10 @@ class MainActivity : AppCompatActivity() {
         connectBtn = findViewById(R.id.connectBtn)
         liveCaptureBtn = findViewById(R.id.liveCaptureBtn)
         reconBtn = findViewById(R.id.reconBtn)
+
+        zoomInBtn = findViewById(R.id.zoomInBtn)
+        zoomOutBtn = findViewById(R.id.zoomOutBtn)
+        resetZoomBtn = findViewById(R.id.resetZoomBtn)
 
         cmdInput = findViewById(R.id.cmdInput)
         sendBtn = findViewById(R.id.sendBtn)
@@ -230,6 +237,10 @@ class MainActivity : AppCompatActivity() {
             rVoltage.text = "Voltage: --"
             appendLog("Showing reconstructed waveform.")
         }
+
+        zoomInBtn.setOnClickListener { scopeView.zoomIn() }
+        zoomOutBtn.setOnClickListener { scopeView.zoomOut() }
+        resetZoomBtn.setOnClickListener { scopeView.resetZoom() }
 
         coarseModeBtn.setOnClickListener {
             hzPerDegree = 3000.0 / 360.0
@@ -335,7 +346,6 @@ class MainActivity : AppCompatActivity() {
             appendLog("USB serial connected.")
             appendLog(manager.debugInInfo())
             startReading()
-            // sync the Arduino to whatever the dial currently shows
             sendFrequency()
         } catch (e: Exception) {
             serial = null
@@ -382,13 +392,11 @@ class MainActivity : AppCompatActivity() {
         val text = line.trim()
         if (text.isEmpty()) return
 
-        // AI companion chatter - just log it, styled
         if (text.startsWith("AI>")) {
             appendStyledLog(text, Color.CYAN)
             return
         }
 
-        // Real capture protocol: CAP,<n>,<rate>  then CSV samples  then ENDCAP
         if (text.startsWith("CAP,")) {
             val parts = text.split(",")
             capturing = true
@@ -409,7 +417,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Status line: "Target: X Hz | Measured: Y Hz | Duty: Z% | Err: E%"
         if (text.startsWith("Target:")) {
             appendSerialLog(text)
             val noSignal = text.contains("NO SIGNAL")
@@ -443,12 +450,9 @@ class MainActivity : AppCompatActivity() {
             val minV = (samples.min() / 255.0) * 5.0
             val maxV = (samples.max() / 255.0) * 5.0
             val avgV = (samples.average() / 255.0) * 5.0
-            rVoltage.text = String.format(Locale.US, "V: min %.2f max %.2f avg %.2f", minV, maxV, avgV)
+            rVoltage.text = String.format(Locale.US, "Voltage: min %.2fV max %.2fV avg %.2fV (real ADC)", minV, maxV, avgV)
         }
 
-        // This is the "live up to ~3-4kHz, then reconstructed" behavior:
-        // below ~4 samples/cycle the real capture is too aliased to trust,
-        // so we fall back honestly instead of showing garbage.
         val label = when {
             spc >= 10 -> "CAPTURED - HIGH FIDELITY"
             spc >= 4 -> "CAPTURED - REDUCED DETAIL"
