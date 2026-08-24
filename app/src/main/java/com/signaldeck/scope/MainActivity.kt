@@ -81,6 +81,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var coarseModeBtn: Button
     private lateinit var fineModeBtn: Button
+    private lateinit var precisionBtn: Button
 
     private lateinit var minus1Btn: Button
     private lateinit var minus01Btn: Button
@@ -242,6 +243,7 @@ class MainActivity : AppCompatActivity() {
 
         coarseModeBtn = findViewById(R.id.coarseModeBtn)
         fineModeBtn = findViewById(R.id.fineModeBtn)
+        precisionBtn = findViewById(R.id.precisionBtn)
 
         minus1Btn = findViewById(R.id.minus1Btn)
         minus01Btn = findViewById(R.id.minus01Btn)
@@ -339,6 +341,13 @@ class MainActivity : AppCompatActivity() {
             dialView.setFrequency(dialFrequency)
             appendLog("Dial: LOG — 270° sweep = 1 Hz → 100 kHz, fine at low Hz")
             sessionLogger.log("APP", "dial scale → log")
+        }
+
+        precisionBtn.setOnClickListener {
+            dialView.scaleMode = "precision"
+            dialView.setFrequency(dialFrequency)
+            appendLog("Dial: PRECISION — multi-turn knob, 2 turns = ×10 / ÷10")
+            sessionLogger.log("APP", "dial scale → precision")
         }
 
         speed1xBtn.setOnClickListener { arrowSpeed = 1; appendLog("Arrow speed: 1×"); sessionLogger.log("APP", "arrow speed 1x") }
