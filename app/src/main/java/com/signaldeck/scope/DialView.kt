@@ -18,12 +18,14 @@ import kotlin.math.sin
  *
  * The needle follows your finger 1:1: wherever you grab the knob, the needle
  * stays put, and then rotates exactly with your finger (real-knob feel).
- * One full 270° sweep covers the whole 1 Hz → 100 kHz range — no multiple turns.
  *
- * Two scales:
- *  - "linear": 270° = 1 Hz → 100 kHz, evenly
- *  - "log":    270° = 1 Hz → 100 kHz, logarithmic — much finer at low Hz
- *              (where inverter work happens)
+ * Three scales:
+ *  - "linear":    270° = 1 Hz → 100 kHz, evenly (big jumps)
+ *  - "log":       270° = 1 Hz → 100 kHz, logarithmic (finer at low Hz)
+ *  - "precision": MULTI-TURN — the knob keeps rotating like a real precision
+ *                 pot. 2 full turns = one decade (×10 or ÷10), so it is ~9×
+ *                 finer than "log" and never runs out of travel; soft stops
+ *                 only at 1 Hz and 100 kHz.
  */
 class DialView @JvmOverloads constructor(
     context: Context,
@@ -39,6 +41,7 @@ class DialView @JvmOverloads constructor(
     var scaleMode: String = "linear"
         set(value) {
             field = value
+            if (value == "precision") syncPrecisionSweep()
             invalidate()
         }
 
@@ -52,13 +55,25 @@ class DialView @JvmOverloads constructor(
     private val startAngle = -135.0
     private val endAngle = 135.0
 
+    // ---- precision (multi-turn) mode state ----
+    // Virtual continuous rotation in degrees; one full decade (×10) = 2 turns.
+    private val precisionDegPerDecade = 720.0
+    private val precisionMaxSweep = precisionDegPerDecade * log10(maxFrequency / minFrequency) // 3600°
+    private var precisionSweep = precisionDegPerDecade * 3.0 // 1000 Hz start -> 2160°
+
     private var touching = false
     private var grabOffset = 0.0
+    private var lastFingerAngle = 0.0
 
     /** Set the needle from outside (nudge buttons, arrows). */
     fun setFrequency(f: Double) {
         currentFrequency = f.coerceIn(minFrequency, maxFrequency)
+        if (scaleMode == "precision") syncPrecisionSweep()
         invalidate()
+    }
+
+    private fun syncPrecisionSweep() {
+        precisionSweep = precisionDegPerDecade * log10(currentFrequency / minFrequency)
     }
 
     private fun angleForFrequency(f: Double): Double {
@@ -80,12 +95,16 @@ class DialView @JvmOverloads constructor(
         }
     }
 
+    private fun frequencyForSweep(s: Double): Double =
+        (minFrequency * Math.pow(10.0, s / precisionDegPerDecade)).coerceIn(minFrequency, maxFrequency)
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
         val cx = width / 2f
         val cy = height / 2f
         val radius = min(width, height) * 0.38f
+        val precision = scaleMode == "precision"
 
         // face
         paint.style = Paint.Style.FILL
@@ -124,16 +143,30 @@ class DialView @JvmOverloads constructor(
         paint.typeface = Typeface.DEFAULT_BOLD
         paint.textAlign = Paint.Align.CENTER
         paint.color = 0xFFAAAAAA.toInt()
-        canvas.drawText("1 Hz", cx + cos(refRad).toFloat() * (radius * 0.55f), cy + sin(refRad).toFloat() * (radius * 0.55f), paint)
-        canvas.drawText("100k", cx + cos(endRad).toFloat() * (radius * 0.55f), cy + sin(endRad).toFloat() * (radius * 0.55f), paint)
+        if (!precision) {
+            canvas.drawText("1 Hz", cx + cos(refRad).toFloat() * (radius * 0.55f), cy + sin(refRad).toFloat() * (radius * 0.55f), paint)
+            canvas.drawText("100k", cx + cos(endRad).toFloat() * (radius * 0.55f), cy + sin(endRad).toFloat() * (radius * 0.55f), paint)
+        } else {
+            // multi-turn: no fixed endpoints, show the turn rule instead
+            paint.textSize = radius * 0.09f
+            canvas.drawText("2 turns = ×10 / ÷10", cx, cy + radius * 0.62f, paint)
+        }
 
         // scale label
         paint.textSize = radius * 0.10f
         paint.color = 0xFF6F9A80.toInt()
-        canvas.drawText(if (scaleMode == "log") "LOG" else "LIN", cx, cy + radius * 0.45f, paint)
+        canvas.drawText(
+            when (scaleMode) {
+                "log" -> "LOG"
+                "precision" -> "PREC"
+                else -> "LIN"
+            },
+            cx, cy + radius * 0.45f, paint
+        )
 
-        // needle
-        val angle = angleForFrequency(currentFrequency)
+        // needle: single-sweep modes use the mapped angle;
+        // precision mode uses the raw (multi-turn) sweep angle
+        val angle = if (precision) precisionSweep else angleForFrequency(currentFrequency)
         val rad = Math.toRadians(angle)
         val needleLength = radius * 0.68f
         paint.strokeWidth = 8f
@@ -160,9 +193,10 @@ class DialView @JvmOverloads constructor(
                 parent?.requestDisallowInterceptTouchEvent(true)
 
                 touching = true
+                lastFingerAngle = angleFromPoint(event.x, event.y, cx, cy)
                 // Remember where the finger grabbed relative to the needle,
                 // so grabbing the knob never makes the needle jump.
-                grabOffset = angleFromPoint(event.x, event.y, cx, cy) - angleForFrequency(currentFrequency)
+                grabOffset = lastFingerAngle - angleForFrequency(currentFrequency)
                 return true
             }
 
@@ -170,8 +204,27 @@ class DialView @JvmOverloads constructor(
                 if (!touching) return true
                 parent?.requestDisallowInterceptTouchEvent(true)
 
-                val needleNow = angleForFrequency(currentFrequency)
                 val finger = angleFromPoint(event.x, event.y, cx, cy)
+
+                if (scaleMode == "precision") {
+                    // MULTI-TURN: accumulate the finger's rotation however many
+                    // full turns it makes — the knob never wraps back on itself.
+                    var delta = finger - lastFingerAngle
+                    while (delta > 180.0) delta -= 360.0
+                    while (delta < -180.0) delta += 360.0
+                    lastFingerAngle = finger
+
+                    precisionSweep = (precisionSweep + delta).coerceIn(0.0, precisionMaxSweep)
+                    val newFreq = frequencyForSweep(precisionSweep)
+                    if (Math.abs(newFreq - currentFrequency) > 0.0005) {
+                        currentFrequency = newFreq
+                        invalidate()
+                        onFrequency?.invoke(currentFrequency)
+                    }
+                    return true
+                }
+
+                val needleNow = angleForFrequency(currentFrequency)
                 var target = finger - grabOffset
 
                 // Unwrap to the nearest equivalent angle so the needle
