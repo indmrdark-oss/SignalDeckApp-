@@ -70,7 +70,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sendBtn: Button
 
     private lateinit var logView: TextView
-    private lateinit var logScroll: ScrollView
     private lateinit var clearLogBtn: Button
 
     private lateinit var rTarget: TextView
@@ -117,6 +116,8 @@ class MainActivity : AppCompatActivity() {
     private var capturing = false
     private var capRate = 0.0
     private var capSamples: IntArray? = null
+    private var capInFlight = false          // a C is out, waiting for ENDCAP
+    private var lastCapDurationMs = 400L     // measured duration of last capture
     private var lastMeasuredHz = 0.0
     private var lastWaveform = false
 
@@ -151,11 +152,18 @@ class MainActivity : AppCompatActivity() {
     private val liveCaptureLoop = object : Runnable {
         override fun run() {
             if (!liveCapture) return
-            if (!capturing) {
+            // Never queue up: the next C goes out only after the previous
+            // capture has fully finished (CAP header -> ENDCAP), and we wait
+            // at least the previous capture's real duration. The old fixed
+            // 400 ms tick was slightly SHORTER than a low-frequency capture
+            // (~405 ms), so C's piled up in the board's input queue, which
+            // batched commands and starved the status lines.
+            if (!capturing && !capInFlight) {
+                capInFlight = true
                 sessionLogger.log("TX", "C")
                 serial?.writeLine("C")
             }
-            handler.postDelayed(this, 400L)
+            handler.postDelayed(this, lastCapDurationMs.coerceAtLeast(400L) + 60L)
         }
     }
 
@@ -233,7 +241,6 @@ class MainActivity : AppCompatActivity() {
         sendBtn = findViewById(R.id.sendBtn)
 
         logView = findViewById(R.id.logView)
-        logScroll = findViewById(R.id.logScroll)
         clearLogBtn = findViewById(R.id.clearLogBtn)
 
         rTarget = findViewById(R.id.rTarget)
@@ -301,6 +308,25 @@ class MainActivity : AppCompatActivity() {
                 serial?.writeLine(command)
                 cmdInput.setText("")
             }
+        }
+
+        // Soft keyboard fix: the command box sits inside a ScrollView, and
+        // when the keyboard opens the layout resize can drop the box's
+        // focus (cursor appears, then vanishes, and typing goes nowhere).
+        // 400 ms after a tap: force focus back and scroll the box into
+        // view above the keyboard.
+        cmdInput.setOnTouchListener { _, e ->
+            if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+                handler.postDelayed({
+                    if (cmdInput.isAttachedToWindow) {
+                        cmdInput.requestFocus()
+                        var p: android.view.ViewParent? = cmdInput.parent
+                        while (p != null && p !is ScrollView) p = p.parent
+                        (p as? ScrollView)?.fullScroll(View.FOCUS_DOWN)
+                    }
+                }, 400L)
+            }
+            false
         }
 
         liveCaptureBtn.setOnClickListener {
@@ -760,7 +786,16 @@ class MainActivity : AppCompatActivity() {
 
     private fun onCaptureComplete() {
         val samples = capSamples ?: return
-        val freq = if (lastWaveform) lastMeasuredHz else dialFrequency
+        capInFlight = false
+        if (capRate > 0 && samples.isNotEmpty()) {
+            lastCapDurationMs = (1000.0 * samples.size / capRate).toLong().coerceIn(50L, 500L)
+        }
+        // Fidelity reference: the dial (target), NOT lastMeasuredHz. The
+        // board locks a new frequency instantly on F, so target == the
+        // frequency that was captured — while lastMeasuredHz can be up to
+        // half a second stale right after a dial jump (that used to give a
+        // wrong "HIGH FIDELITY" at 42 kHz and a wrong "TOO FAST" at 6 Hz).
+        val freq = dialFrequency
         val spc = if (freq > 0) capRate / freq else 0.0
 
         if (samples.isNotEmpty()) {
@@ -794,6 +829,8 @@ class MainActivity : AppCompatActivity() {
         keepReading = false
         repeatDirection = 0
         liveCapture = false
+        capturing = false        // stale flags would brick the next live capture
+        capInFlight = false
         if (wasConnected) liveCaptureBtn.text = "Start Live Capture"
         handler.removeCallbacks(repeatRunnable)
         try { readThread?.interrupt() } catch (_: Exception) {}
@@ -822,7 +859,6 @@ class MainActivity : AppCompatActivity() {
         handler.post {
             val current = logView.text.toString()
             logView.text = if (current.isEmpty()) message else "$current\n$message"
-            logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
         }
     }
 
@@ -843,7 +879,6 @@ class MainActivity : AppCompatActivity() {
         val text = SpannableString("$message\n")
         text.setSpan(ForegroundColorSpan(color), 0, message.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         logView.append(text)
-        logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     override fun onPause() {
