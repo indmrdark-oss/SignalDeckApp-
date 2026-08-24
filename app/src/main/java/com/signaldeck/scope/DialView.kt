@@ -18,11 +18,11 @@ import kotlin.math.sin
  *
  * The needle follows your finger 1:1: wherever you grab the knob, the needle
  * stays put, and then rotates exactly with your finger (real-knob feel).
- * One full 270° sweep covers the whole 1 Hz → 20 kHz range — no multiple turns.
+ * One full 270° sweep covers the whole 1 Hz → 100 kHz range — no multiple turns.
  *
  * Two scales:
- *  - "linear": 270° = 1 Hz → 20 kHz, evenly
- *  - "log":    270° = 1 Hz → 20 kHz, logarithmic — much finer at low Hz
+ *  - "linear": 270° = 1 Hz → 100 kHz, evenly
+ *  - "log":    270° = 1 Hz → 100 kHz, logarithmic — much finer at low Hz
  *              (where inverter work happens)
  */
 class DialView @JvmOverloads constructor(
@@ -48,7 +48,7 @@ class DialView @JvmOverloads constructor(
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private val minFrequency = 1.0
-    private val maxFrequency = 20000.0
+    private val maxFrequency = 100000.0
     private val startAngle = -135.0
     private val endAngle = 135.0
 
@@ -125,7 +125,7 @@ class DialView @JvmOverloads constructor(
         paint.textAlign = Paint.Align.CENTER
         paint.color = 0xFFAAAAAA.toInt()
         canvas.drawText("1 Hz", cx + cos(refRad).toFloat() * (radius * 0.55f), cy + sin(refRad).toFloat() * (radius * 0.55f), paint)
-        canvas.drawText("20k", cx + cos(endRad).toFloat() * (radius * 0.55f), cy + sin(endRad).toFloat() * (radius * 0.55f), paint)
+        canvas.drawText("100k", cx + cos(endRad).toFloat() * (radius * 0.55f), cy + sin(endRad).toFloat() * (radius * 0.55f), paint)
 
         // scale label
         paint.textSize = radius * 0.10f
@@ -179,7 +179,7 @@ class DialView @JvmOverloads constructor(
                 while (target - needleNow > 180.0) target -= 360.0
                 while (needleNow - target > 180.0) target += 360.0
 
-                // Soft stops: the needle clamps at 1 Hz / 20 kHz instead of wrapping.
+                // Soft stops: the needle clamps at 1 Hz / 100 kHz instead of wrapping.
                 target = target.coerceIn(startAngle, endAngle)
 
                 val newFreq = frequencyForAngle(target)
