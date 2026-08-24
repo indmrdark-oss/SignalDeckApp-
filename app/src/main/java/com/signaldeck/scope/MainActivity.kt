@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity() {
 
     private var dialFrequency = 1000.0
     private val F_MIN = 1.0
-    private val F_MAX = 20000.0
+    private val F_MAX = 100000.0
 
     private var arrowSpeed = 1
     private var repeatDirection = 0
@@ -330,14 +330,14 @@ class MainActivity : AppCompatActivity() {
         coarseModeBtn.setOnClickListener {
             dialView.scaleMode = "linear"
             dialView.setFrequency(dialFrequency)
-            appendLog("Dial: LINEAR — 270° sweep = 1 Hz → 20 kHz")
+            appendLog("Dial: LINEAR — 270° sweep = 1 Hz → 100 kHz")
             sessionLogger.log("APP", "dial scale → linear")
         }
 
         fineModeBtn.setOnClickListener {
             dialView.scaleMode = "log"
             dialView.setFrequency(dialFrequency)
-            appendLog("Dial: LOG — 270° sweep = 1 Hz → 20 kHz, fine at low Hz")
+            appendLog("Dial: LOG — 270° sweep = 1 Hz → 100 kHz, fine at low Hz")
             sessionLogger.log("APP", "dial scale → log")
         }
 
