@@ -173,7 +173,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Drag the knob — needle follows your finger 1:1 · 270° sweep = full range"
+                    android:text="Drag the knob — needle follows your finger 1:1 · PRECISION = multi-turn knob (2 turns = ×10)"
                     android:textColor="#6F9A80"
                     android:textSize="9.5sp"
                     android:gravity="center"
@@ -189,6 +189,8 @@
                         android:layout_height="wrap_content" android:text="Linear" android:textSize="12sp" />
                     <Button android:id="@+id/fineModeBtn" android:layout_width="0dp" android:layout_weight="1"
                         android:layout_height="wrap_content" android:text="Log" android:textSize="12sp" />
+                    <Button android:id="@+id/precisionBtn" android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_height="wrap_content" android:text="Precision" android:textSize="12sp" />
                 </LinearLayout>
 
                 <LinearLayout
