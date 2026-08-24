@@ -118,6 +118,7 @@ class MainActivity : AppCompatActivity() {
     private var capSamples: IntArray? = null
     private var capInFlight = false          // a C is out, waiting for ENDCAP
     private var lastCapDurationMs = 400L     // measured duration of last capture
+    private var lastCmdTapMs = 0L            // last tap on the command box (keyboard fix)
     private var lastMeasuredHz = 0.0
     private var lastWaveform = false
 
@@ -310,13 +311,16 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Soft keyboard fix: the command box sits inside a ScrollView, and
-        // when the keyboard opens the layout resize can drop the box's
-        // focus (cursor appears, then vanishes, and typing goes nowhere).
-        // 400 ms after a tap: force focus back and scroll the box into
-        // view above the keyboard.
+        // Soft keyboard fix — 3 layers:
+        // 1) AndroidManifest sets windowSoftInputMode="adjustResize" so the
+        //    keyboard always pushes the layout up instead of covering it.
+        // 2) 400 ms after a tap: force focus back and scroll the box into
+        //    view (the resize can drop the box's focus — cursor appears,
+        //    then vanishes, and typing goes nowhere).
+        // 3) If focus is still lost within 1 s of the tap, restore it again.
         cmdInput.setOnTouchListener { _, e ->
             if (e.actionMasked == MotionEvent.ACTION_DOWN) {
+                lastCmdTapMs = SystemClock.elapsedRealtime()
                 handler.postDelayed({
                     if (cmdInput.isAttachedToWindow) {
                         cmdInput.requestFocus()
@@ -327,6 +331,15 @@ class MainActivity : AppCompatActivity() {
                 }, 400L)
             }
             false
+        }
+        cmdInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus && SystemClock.elapsedRealtime() - lastCmdTapMs < 1000L) {
+                handler.postDelayed({
+                    if (cmdInput.isAttachedToWindow && !cmdInput.hasFocus()) {
+                        cmdInput.requestFocus()
+                    }
+                }, 250L)
+            }
         }
 
         liveCaptureBtn.setOnClickListener {
@@ -785,8 +798,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onCaptureComplete() {
-        val samples = capSamples ?: return
+        // ENDCAP always means "capture finished" — clear the flag FIRST,
+        // so a capture that ended with no samples can't leave live
+        // capture stuck forever.
         capInFlight = false
+        val samples = capSamples ?: return
         if (capRate > 0 && samples.isNotEmpty()) {
             lastCapDurationMs = (1000.0 * samples.size / capRate).toLong().coerceIn(50L, 500L)
         }
