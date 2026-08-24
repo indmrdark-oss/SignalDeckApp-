@@ -39,6 +39,7 @@ class ScopeView @JvmOverloads constructor(
     var liveFreq: Double = 0.0
     var liveDuty: Double = 50.0
     var waveformPresent: Boolean = false
+    var paused: Boolean = false
     private var phase = 0.0
     private var lastFrameNanos = System.nanoTime()
 
@@ -55,7 +56,7 @@ class ScopeView @JvmOverloads constructor(
     private val handler = Handler(Looper.getMainLooper())
     private val tick = object : Runnable {
         override fun run() {
-            if (mode == "reconstructed") invalidate()
+            if (mode == "reconstructed" && !paused) invalidate()
             handler.postDelayed(this, 30)
         }
     }
