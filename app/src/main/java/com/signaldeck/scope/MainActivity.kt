@@ -540,4 +540,315 @@ class MainActivity : AppCompatActivity() {
                 logbookView.text = shown
                 logbookScroll.scrollTo(0, 0)
             }
-     
+        }.start()
+    }
+
+    // ================= FREQUENCY =================
+
+    private fun changeFrequencyFromArrow() {
+        val step = if (arrowSpeed == 1) 1.0 else 5.0
+        dialFrequency = (dialFrequency + repeatDirection * step).coerceIn(F_MIN, F_MAX)
+        updateDialDisplay()
+        sendFrequency()
+    }
+
+    private fun nudgeFrequency(amount: Double) {
+        dialFrequency = (dialFrequency + amount).coerceIn(F_MIN, F_MAX)
+        updateDialDisplay()
+        sendFrequency()
+        sessionLogger.log("APP", "nudge ${if (amount > 0) "+" else ""}${amount} → ${String.format(Locale.US, "%.2f Hz", dialFrequency)}")
+    }
+
+    private fun updateDialDisplay() {
+        val value = String.format(Locale.US, "%.2f Hz", dialFrequency)
+        rTargetBig.text = value
+        rTarget.text = "Target: $value"
+        dialView.setFrequency(dialFrequency)
+    }
+
+    private fun throttledFrequencySend() {
+        // while dragging, the dial fires many times a second —
+        // cap serial spam at 10 commands/sec; the final value is always
+        // sent on finger-up via onCommit.
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastFreqTxMs >= 100L) sendFrequency()
+    }
+
+    private fun sendFrequency() {
+        val command = String.format(Locale.US, "F%.2f", dialFrequency)
+        lastFreqTxMs = SystemClock.elapsedRealtime()
+        lastSentFreq = dialFrequency
+        sessionLogger.log("TX", command)
+        serial?.writeLine(command)
+    }
+
+    private fun requestDevice() {
+        val devices = usbManager.deviceList.values
+        if (devices.isEmpty()) { appendLog("No USB device found."); return }
+        val device = devices.first()
+        if (usbManager.hasPermission(device)) { connectToDevice(device); return }
+        val intent = Intent(ACTION_USB_PERMISSION).setPackage(packageName)
+        val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+        val permissionIntent = PendingIntent.getBroadcast(this, 0, intent, flags)
+        usbManager.requestPermission(device, permissionIntent)
+        appendLog("Requesting USB permission...")
+        sessionLogger.log("SYS", "requesting USB permission for ${deviceDesc(device)}")
+    }
+
+    private fun connectToDevice(device: UsbDevice) {
+        try {
+            val manager = UsbSerialManager(usbManager, device)
+            val opened = manager.open(BAUD_RATE)
+            if (!opened) {
+                appendLog("Could not open USB serial port.")
+                sessionLogger.log("SYS", "open failed for ${deviceDesc(device)}")
+                manager.close()
+                return
+            }
+            serial = manager
+            connStatus.text = "Connected"
+            connectBtn.text = "Disconnect"
+            appendLog("USB serial connected.")
+            sessionLogger.startSession("${deviceDesc(device)} @ $BAUD_RATE baud")
+            appendLog(manager.debugInInfo())
+            startReading()
+            sendFrequency()
+        } catch (e: Exception) {
+            serial = null
+            connStatus.text = "Disconnected"
+            connectBtn.text = "Connect"
+            appendLog("Connection failed: ${e.message}")
+            sessionLogger.log("SYS", "exception: ${e.message}")
+        }
+    }
+
+    private fun deviceDesc(d: UsbDevice): String =
+        String.format(Locale.US, "USB %04X:%04X %s", d.vendorId, d.productId, d.deviceName)
+
+    private fun startReading() {
+        if (keepReading) return
+        keepReading = true
+        readThread = Thread {
+            val buffer = ByteArray(4096)
+            val lineBuilder = StringBuilder()
+            while (keepReading) {
+                try {
+                    val count = serial?.read(buffer, 100) ?: -1
+                    if (count > 0) {
+                        val chunk = String(buffer, 0, count, Charsets.US_ASCII)
+                        lineBuilder.append(chunk)
+                        while (true) {
+                            val newlineIndex = lineBuilder.indexOf("\n")
+                            if (newlineIndex < 0) break
+                            val line = lineBuilder.substring(0, newlineIndex).trim()
+                            lineBuilder.delete(0, newlineIndex + 1)
+                            if (line.isNotEmpty()) {
+                                handler.post { processSerialLine(line) }
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    if (keepReading) {
+                        handler.post { appendLog("Read error: ${e.message}") }
+                        sessionLogger.log("SYS", "read error: ${e.message}")
+                    }
+                    break
+                }
+            }
+        }
+        readThread?.start()
+    }
+
+    private fun processSerialLine(line: String) {
+        val text = line.trim()
+        if (text.isEmpty()) return
+
+        // Everything from the Uno goes into the logbook file.
+        // Long sample lines are truncated in the file to keep it readable.
+        if (capturing && text.matches(Regex("^[0-9,]+$")) && text.length > 120) {
+            sessionLogger.log("RX", text.substring(0, 120) + " …(sample data, ${text.length} chars total)")
+        } else {
+            sessionLogger.log("RX", text)
+        }
+
+        if (text.startsWith("AI>")) {
+            // Device feedback: shown, but suppressed while dragging the dial
+            // (it would still spam; the logbook keeps every one).
+            if (!dialDragging) showOnce(text, Color.CYAN)
+            return
+        }
+
+        if (text.startsWith("CAP,")) {
+            val parts = text.split(",")
+            capturing = true
+            capRate = parts.getOrNull(2)?.toDoubleOrNull() ?: 0.0
+            capSamples = null
+            return
+        }
+        if (capturing) {
+            if (text == "ENDCAP") {
+                capturing = false
+                onCaptureComplete()
+                return
+            }
+            // Sample lines may arrive split across several lines — append, don't overwrite.
+            if (text.matches(Regex("^[0-9,]+$"))) {
+                val arr = text.split(",").mapNotNull { it.toIntOrNull() }.toIntArray()
+                val prev = capSamples
+                capSamples = if (prev == null) arr else prev.plus(arr)
+                return
+            }
+        }
+
+        if (text.startsWith("Target:")) {
+            val targetHz = Regex("Target:\\s*([\\d.]+)").find(text)?.groupValues?.get(1)?.toDoubleOrNull()
+            val measuredHz = Regex("Measured:\\s*([\\d.]+)").find(text)?.groupValues?.get(1)?.toDoubleOrNull()
+            val dutyStr = Regex("Duty:\\s*([\\d.]+)").find(text)?.groupValues?.get(1)
+            val errStr = Regex("Err:\\s*([\\d.]+)").find(text)?.groupValues?.get(1)
+            val noSignal = text.contains("NO SIGNAL")
+
+            // Readouts always update silently (no visible-log spam).
+            targetHz?.let { rTarget.text = String.format(Locale.US, "Target: %.2f Hz", it) }
+            dutyStr?.let {
+                rDuty.text = "Duty: $it%"
+                scopeView.liveDuty = it.toDoubleOrNull() ?: 50.0
+            }
+            lastWaveform = !noSignal
+            if (lastWaveform) measuredHz?.let { lastMeasuredHz = it }
+            rMeasured.text = if (lastWaveform && measuredHz != null)
+                String.format(Locale.US, "Measured: %.2f Hz", measuredHz)
+            else "Measured: NO SIGNAL"
+            rRate.text = if (lastWaveform) "Signal present" else "No signal"
+            scopeView.liveFreq = if (lastWaveform && measuredHz != null) measuredHz else dialFrequency
+            scopeView.waveformPresent = lastWaveform
+            if (!liveCapture && scopeView.mode != "captured") scopeView.showReconstructed()
+
+            // Visible log: only when the frequency actually changes.
+            if (targetHz != null && targetHz != lastLoggedTarget) {
+                val prev = lastLoggedTarget
+                lastLoggedTarget = targetHz
+                val shown = if (prev < 0)
+                    "Target: ${String.format(Locale.US, "%.2f Hz", targetHz)}"
+                else
+                    "Target: ${String.format(Locale.US, "%.2f", prev)} → ${String.format(Locale.US, "%.2f Hz", targetHz)}"
+                appendStyledLog(shown, Color.GREEN)
+            }
+
+            // One warning when the error gets large — not one per line.
+            val err = errStr?.toDoubleOrNull() ?: 0.0
+            val now = SystemClock.elapsedRealtime()
+            if (err > 2.0 && now - lastErrWarnMs > 5000) {
+                lastErrWarnMs = now
+                appendStyledLog("⚠ Err ${errStr}% — measured disagrees with target", 0xFFFF8A65.toInt())
+            }
+            return
+        }
+
+        // Anything else: logbook only, never the visible log.
+    }
+
+    private fun onCaptureComplete() {
+        val samples = capSamples ?: return
+        val freq = if (lastWaveform) lastMeasuredHz else dialFrequency
+        val spc = if (freq > 0) capRate / freq else 0.0
+
+        if (samples.isNotEmpty()) {
+            val minV = (samples.min() / 255.0) * 5.0
+            val maxV = (samples.max() / 255.0) * 5.0
+            val avgV = (samples.average() / 255.0) * 5.0
+            rVoltage.text = String.format(Locale.US, "Voltage: min %.2fV max %.2fV avg %.2fV (real ADC)", minV, maxV, avgV)
+        }
+
+        val label = when {
+            spc >= 10 -> "CAPTURED - HIGH FIDELITY"
+            spc >= 4 -> "CAPTURED - REDUCED DETAIL"
+            else -> "TOO FAST - RECONSTRUCTED"
+        }
+
+        sessionLogger.log("APP", "capture done: ${samples.size} samples @ ${String.format(Locale.US, "%.0f", capRate)} Hz → $label")
+        if (!liveCapture || label != lastCaptureLabel) {
+            lastCaptureLabel = label
+            appendStyledLog("Capture: ${samples.size} samples — $label", 0xFF81C784.toInt())
+        }
+
+        if (spc >= 4) {
+            scopeView.showCaptured(samples, label, capRate)
+        } else {
+            scopeView.showReconstructed()
+        }
+    }
+
+    private fun disconnect(reason: String) {
+        val wasConnected = serial != null
+        keepReading = false
+        repeatDirection = 0
+        liveCapture = false
+        if (wasConnected) liveCaptureBtn.text = "Start Live Capture"
+        handler.removeCallbacks(repeatRunnable)
+        try { readThread?.interrupt() } catch (_: Exception) {}
+        readThread = null
+        try { serial?.close() } catch (_: Exception) {}
+        serial = null
+
+        if (wasConnected) {
+            connStatus.text = "Disconnected"
+            connectBtn.text = "Connect"
+            rMeasured.text = "Measured: --"
+            rRate.text = "Rate: --"
+            rVoltage.text = "Voltage: -- (no real capture yet)"
+            scopeView.waveformPresent = false
+            lastWaveform = false
+            lastLoggedTarget = -1.0
+            sessionLogger.endSession(reason)
+            refreshSessionList()
+            appendLog("Disconnected.")
+        }
+    }
+
+    // ================= LOGGING HELPERS =================
+
+    private fun appendLog(message: String) {
+        handler.post {
+            val current = logView.text.toString()
+            logView.text = if (current.isEmpty()) message else "$current\n$message"
+        }
+    }
+
+    private fun appendCommandLog(command: String) {
+        appendStyledLog(">> $command", Color.RED)
+    }
+
+    /** AI> dedupe: identical device feedback within 2 s is shown once. */
+    private fun showOnce(text: String, color: Int, gapMs: Long = 2000L) {
+        val now = SystemClock.elapsedRealtime()
+        if (text == lastShownText && now - lastShownMs < gapMs) return
+        lastShownText = text
+        lastShownMs = now
+        appendStyledLog(text, color)
+    }
+
+    private fun appendStyledLog(message: String, color: Int) {
+        val text = SpannableString("$message\n")
+        text.setSpan(ForegroundColorSpan(color), 0, message.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        logView.append(text)
+    }
+
+    override fun onPause() {
+        scopeView.paused = true
+        super.onPause()
+    }
+
+    override fun onResume() {
+        scopeView.paused = false
+        super.onResume()
+    }
+
+    override fun onDestroy() {
+        repeatDirection = 0
+        handler.removeCallbacks(repeatRunnable)
+        keepReading = false
+        try { unregisterReceiver(usbReceiver) } catch (_: Exception) {}
+        disconnect("app closed")
+        super.onDestroy()
+    }
+}
