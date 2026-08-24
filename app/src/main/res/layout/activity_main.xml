@@ -44,9 +44,13 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Everything scrollable stays in here; the command box + LOG are
+             PINNED below (outside this ScrollView) so the keyboard can never
+             yank focus away from the input field. -->
         <ScrollView
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:background="#070B08">
 
             <LinearLayout
@@ -252,66 +256,86 @@
                         android:layout_height="wrap_content" android:text="Reconstructed" />
                 </LinearLayout>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- ================= PINNED BOTTOM PANEL (never scrolls, keyboard-safe) ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#0D150E"
+            android:paddingLeft="16dp"
+            android:paddingStart="16dp"
+            android:paddingRight="16dp"
+            android:paddingEnd="16dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <EditText
+                    android:id="@+id/cmdInput"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="12dp">
+                    android:hint="type command, e.g. F8.80 · H"
+                    android:textColor="#BFE8CD"
+                    android:textColorHint="#6F9A80"
+                    android:inputType="text"
+                    android:singleLine="true"
+                    android:imeOptions="actionSend" />
 
-                    <EditText
-                        android:id="@+id/cmdInput"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:hint="type command, e.g. D"
-                        android:textColor="#BFE8CD"
-                        android:textColorHint="#6F9A80"
-                        android:inputType="text"
-                        android:imeOptions="actionSend" />
-
-                    <Button
-                        android:id="@+id/sendBtn"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Send" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
+                <Button
+                    android:id="@+id/sendBtn"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="4dp">
+                    android:text="Send" />
+            </LinearLayout>
 
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="LOG"
-                        android:textColor="#6F9A80"
-                        android:textSize="10.5sp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="4dp">
 
-                    <Button
-                        android:id="@+id/clearLogBtn"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Clear Log"
-                        android:textSize="11sp" />
-                </LinearLayout>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="LOG"
+                    android:textColor="#6F9A80"
+                    android:textSize="10.5sp" />
+
+                <Button
+                    android:id="@+id/clearLogBtn"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Clear Log"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <ScrollView
+                android:id="@+id/logScroll"
+                android:layout_width="match_parent"
+                android:layout_height="140dp"
+                android:background="#070B08">
 
                 <TextView
                     android:id="@+id/logView"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:minHeight="200dp"
-                    android:background="#0D150E"
                     android:padding="10dp"
                     android:textColor="#4DFFA0"
                     android:fontFamily="monospace"
                     android:textSize="11sp" />
-
-            </LinearLayout>
-        </ScrollView>
+            </ScrollView>
+        </LinearLayout>
     </LinearLayout>
 
     <!-- ================= LOGBOOK (screen 2) ================= -->
