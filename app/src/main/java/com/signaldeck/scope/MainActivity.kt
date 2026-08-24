@@ -6,20 +6,28 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
+import android.graphics.Typeface
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.MotionEvent
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
@@ -29,6 +37,25 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var scopeView: ScopeView
     private lateinit var dialView: DialView
+
+    // navigation (drawer + screens)
+    private lateinit var slideRoot: SlideFrameLayout
+    private lateinit var mainPage: View
+    private lateinit var logbookPage: View
+    private lateinit var scrimView: View
+    private lateinit var drawerView: View
+    private lateinit var menuBtnMain: View
+    private lateinit var menuBtnLog: View
+    private lateinit var drawerMainOpt: LinearLayout
+    private lateinit var drawerLogOpt: LinearLayout
+
+    // logbook screen
+    private lateinit var liveBtn: Button
+    private lateinit var refreshFilesBtn: Button
+    private lateinit var viewerTitle: TextView
+    private lateinit var logbookView: TextView
+    private lateinit var logbookScroll: ScrollView
+    private lateinit var sessionsList: LinearLayout
 
     private lateinit var connStatus: TextView
     private lateinit var connectBtn: Button
@@ -66,6 +93,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var speed1xBtn: Button
     private lateinit var speed2xBtn: Button
 
+    private lateinit var sessionLogger: SessionLogger
+
     private val ACTION_USB_PERMISSION = "com.signaldeck.scope.USB_PERMISSION"
     private val BAUD_RATE = 250000
 
@@ -77,10 +106,10 @@ class MainActivity : AppCompatActivity() {
     private var dialFrequency = 1000.0
     private val F_MIN = 1.0
     private val F_MAX = 20000.0
-    private var hzPerDegree = 8000.0 / 360.0
 
     private var arrowSpeed = 1
     private var repeatDirection = 0
+    private var sweepStartFreq = 0.0
     private var liveCapture = false
 
     private var capturing = false
@@ -88,6 +117,25 @@ class MainActivity : AppCompatActivity() {
     private var capSamples: IntArray? = null
     private var lastMeasuredHz = 0.0
     private var lastWaveform = false
+
+    // --- visible-log filtering (on-screen log shows only changes + commands) ---
+    private var lastLoggedTarget = -1.0
+    private var lastErrWarnMs = 0L
+    private var lastCaptureLabel: String? = null
+    private var lastShownText = ""
+    private var lastShownMs = 0L
+    private var dialDragging = false
+
+    // --- frequency send throttling ---
+    private var lastSentFreq = 1000.0
+    private var lastFreqTxMs = 0L
+
+    // --- drawer / screens ---
+    private var currentScreen = 0 // 0 = main app, 1 = logbook
+    private var drawerOpen = false
+    private var drawerAnimating = false
+    private var logbookIsLive = true
+    private var drawerDownX = 0f
 
     private val repeatRunnable = object : Runnable {
         override fun run() {
@@ -101,7 +149,10 @@ class MainActivity : AppCompatActivity() {
     private val liveCaptureLoop = object : Runnable {
         override fun run() {
             if (!liveCapture) return
-            if (!capturing) serial?.writeLine("C")
+            if (!capturing) {
+                sessionLogger.log("TX", "C")
+                serial?.writeLine("C")
+            }
             handler.postDelayed(this, 400L)
         }
     }
@@ -123,10 +174,18 @@ class MainActivity : AppCompatActivity() {
                         connectToDevice(device)
                     } else {
                         appendLog("USB permission denied.")
+                        sessionLogger.log("SYS", "USB permission denied")
                     }
                 }
-                UsbManager.ACTION_USB_DEVICE_ATTACHED -> appendLog("USB device attached. Tap Connect.")
-                UsbManager.ACTION_USB_DEVICE_DETACHED -> { appendLog("USB device detached."); disconnect() }
+                UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
+                    appendLog("USB device attached. Tap Connect.")
+                    sessionLogger.log("SYS", "USB device attached")
+                }
+                UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                    appendLog("USB device detached.")
+                    sessionLogger.log("SYS", "USB device detached")
+                    disconnect("device detached")
+                }
             }
         }
     }
@@ -136,9 +195,28 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        sessionLogger = SessionLogger(this)
+        sessionLogger.onLogLine = { line -> handler.post { appendLogbookLine(line) } }
 
         scopeView = findViewById(R.id.scopeView)
         dialView = findViewById(R.id.dialView)
+
+        slideRoot = findViewById(R.id.slideRoot)
+        mainPage = findViewById(R.id.mainPage)
+        logbookPage = findViewById(R.id.logbookPage)
+        scrimView = findViewById(R.id.scrimView)
+        drawerView = findViewById(R.id.drawerView)
+        menuBtnMain = findViewById(R.id.menuBtnMain)
+        menuBtnLog = findViewById(R.id.menuBtnLog)
+        drawerMainOpt = findViewById(R.id.drawerMainOpt)
+        drawerLogOpt = findViewById(R.id.drawerLogOpt)
+
+        liveBtn = findViewById(R.id.liveBtn)
+        refreshFilesBtn = findViewById(R.id.refreshFilesBtn)
+        viewerTitle = findViewById(R.id.viewerTitle)
+        logbookView = findViewById(R.id.logbookView)
+        logbookScroll = findViewById(R.id.logbookScroll)
+        sessionsList = findViewById(R.id.sessionsList)
 
         connStatus = findViewById(R.id.connStatus)
         connectBtn = findViewById(R.id.connectBtn)
@@ -179,6 +257,7 @@ class MainActivity : AppCompatActivity() {
         setupUsbReceiver()
         setupButtons()
         setupDial()
+        setupDrawer()
 
         updateDialDisplay()
 
@@ -202,15 +281,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         connectBtn.setOnClickListener {
-            if (serial != null) disconnect() else requestDevice()
+            if (serial != null) disconnect("user requested") else requestDevice()
         }
 
-        clearLogBtn.setOnClickListener { logView.text = "" }
+        clearLogBtn.setOnClickListener {
+            logView.text = ""
+            sessionLogger.log("APP", "on-screen log cleared by user")
+        }
 
         sendBtn.setOnClickListener {
             val command = cmdInput.text.toString().trim()
             if (command.isNotEmpty()) {
                 appendCommandLog(command)
+                sessionLogger.log("TX", command)
                 serial?.writeLine(command)
                 cmdInput.setText("")
             }
@@ -219,12 +302,15 @@ class MainActivity : AppCompatActivity() {
         liveCaptureBtn.setOnClickListener {
             liveCapture = !liveCapture
             if (liveCapture) {
+                lastCaptureLabel = null
                 liveCaptureBtn.text = "Stop Live Capture"
                 appendLog("Live capture started.")
+                sessionLogger.log("APP", "live capture ON")
                 handler.post(liveCaptureLoop)
             } else {
                 liveCaptureBtn.text = "Start Live Capture"
                 appendLog("Live capture stopped.")
+                sessionLogger.log("APP", "live capture OFF")
             }
         }
 
@@ -234,24 +320,29 @@ class MainActivity : AppCompatActivity() {
             scopeView.showReconstructed()
             rVoltage.text = "Voltage: --"
             appendLog("Showing reconstructed waveform.")
+            sessionLogger.log("APP", "showing reconstructed waveform")
         }
 
-        zoomInBtn.setOnClickListener { scopeView.zoomIn() }
-        zoomOutBtn.setOnClickListener { scopeView.zoomOut() }
-        resetZoomBtn.setOnClickListener { scopeView.resetZoom() }
+        zoomInBtn.setOnClickListener { scopeView.zoomIn(); sessionLogger.log("APP", "zoom in") }
+        zoomOutBtn.setOnClickListener { scopeView.zoomOut(); sessionLogger.log("APP", "zoom out") }
+        resetZoomBtn.setOnClickListener { scopeView.resetZoom(); sessionLogger.log("APP", "zoom reset") }
 
         coarseModeBtn.setOnClickListener {
-            hzPerDegree = 8000.0 / 360.0
-            appendLog("Dial: COARSE — 1 rotation ≈ 8000 Hz")
+            dialView.scaleMode = "linear"
+            dialView.setFrequency(dialFrequency)
+            appendLog("Dial: LINEAR — 270° sweep = 1 Hz → 20 kHz")
+            sessionLogger.log("APP", "dial scale → linear")
         }
 
         fineModeBtn.setOnClickListener {
-            hzPerDegree = 300.0 / 360.0
-            appendLog("Dial: FINE — 1 rotation ≈ 300 Hz")
+            dialView.scaleMode = "log"
+            dialView.setFrequency(dialFrequency)
+            appendLog("Dial: LOG — 270° sweep = 1 Hz → 20 kHz, fine at low Hz")
+            sessionLogger.log("APP", "dial scale → log")
         }
 
-        speed1xBtn.setOnClickListener { arrowSpeed = 1; appendLog("Arrow speed: 1×") }
-        speed2xBtn.setOnClickListener { arrowSpeed = 2; appendLog("Arrow speed: 2×") }
+        speed1xBtn.setOnClickListener { arrowSpeed = 1; appendLog("Arrow speed: 1×"); sessionLogger.log("APP", "arrow speed 1x") }
+        speed2xBtn.setOnClickListener { arrowSpeed = 2; appendLog("Arrow speed: 2×"); sessionLogger.log("APP", "arrow speed 2x") }
 
         minus1Btn.setOnClickListener { nudgeFrequency(-1.0) }
         minus01Btn.setOnClickListener { nudgeFrequency(-0.1) }
@@ -267,6 +358,7 @@ class MainActivity : AppCompatActivity() {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     repeatDirection = direction
+                    sweepStartFreq = dialFrequency
                     changeFrequencyFromArrow()
                     handler.removeCallbacks(repeatRunnable)
                     handler.postDelayed(repeatRunnable, 250L)
@@ -275,6 +367,13 @@ class MainActivity : AppCompatActivity() {
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                     repeatDirection = 0
                     handler.removeCallbacks(repeatRunnable)
+                    if (event.actionMasked == MotionEvent.ACTION_UP) {
+                        sessionLogger.log(
+                            "APP",
+                            "sweep ${if (direction < 0) "◀" else "▶"} ${arrowSpeed}×: " +
+                                String.format(Locale.US, "%.2f → %.2f Hz", sweepStartFreq, dialFrequency)
+                        )
+                    }
                     true
                 }
                 else -> true
@@ -283,228 +382,162 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupDial() {
-        dialView.onRotate = { degrees ->
-            val change = degrees * hzPerDegree
-            dialFrequency = (dialFrequency + change).coerceIn(F_MIN, F_MAX)
+        dialView.onFrequency = { f ->
+            dialDragging = true
+            dialFrequency = f
             updateDialDisplay()
-            sendFrequency()
+            throttledFrequencySend()
         }
-    }
-
-    private fun changeFrequencyFromArrow() {
-        val step = if (arrowSpeed == 1) 1.0 else 5.0
-        dialFrequency = (dialFrequency + repeatDirection * step).coerceIn(F_MIN, F_MAX)
-        updateDialDisplay()
-        sendFrequency()
-    }
-
-    private fun nudgeFrequency(amount: Double) {
-        dialFrequency = (dialFrequency + amount).coerceIn(F_MIN, F_MAX)
-        updateDialDisplay()
-        sendFrequency()
-    }
-
-    private fun updateDialDisplay() {
-        val value = String.format(Locale.US, "%.2f Hz", dialFrequency)
-        rTargetBig.text = value
-        rTarget.text = "Target: $value"
-        dialView.currentFrequency = dialFrequency
-        dialView.invalidate()
-    }
-
-    private fun sendFrequency() {
-        val command = String.format(Locale.US, "F%.2f", dialFrequency)
-        serial?.writeLine(command)
-    }
-
-    private fun requestDevice() {
-        val devices = usbManager.deviceList.values
-        if (devices.isEmpty()) { appendLog("No USB device found."); return }
-        val device = devices.first()
-        if (usbManager.hasPermission(device)) { connectToDevice(device); return }
-        val intent = Intent(ACTION_USB_PERMISSION).setPackage(packageName)
-        val flags = if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
-        val permissionIntent = PendingIntent.getBroadcast(this, 0, intent, flags)
-        usbManager.requestPermission(device, permissionIntent)
-        appendLog("Requesting USB permission...")
-    }
-
-    private fun connectToDevice(device: UsbDevice) {
-        try {
-            val manager = UsbSerialManager(usbManager, device)
-            val opened = manager.open(BAUD_RATE)
-            if (!opened) {
-                appendLog("Could not open USB serial port.")
-                manager.close()
-                return
-            }
-            serial = manager
-            connStatus.text = "Connected"
-            connectBtn.text = "Disconnect"
-            appendLog("USB serial connected.")
-            appendLog(manager.debugInInfo())
-            startReading()
-            sendFrequency()
-        } catch (e: Exception) {
-            serial = null
-            connStatus.text = "Disconnected"
-            connectBtn.text = "Connect"
-            appendLog("Connection failed: ${e.message}")
-        }
-    }
-
-    private fun startReading() {
-        if (keepReading) return
-        keepReading = true
-        readThread = Thread {
-            val buffer = ByteArray(4096)
-            val lineBuilder = StringBuilder()
-            while (keepReading) {
-                try {
-                    val count = serial?.read(buffer, 100) ?: -1
-                    if (count > 0) {
-                        val chunk = String(buffer, 0, count, Charsets.US_ASCII)
-                        lineBuilder.append(chunk)
-                        while (true) {
-                            val newlineIndex = lineBuilder.indexOf("\n")
-                            if (newlineIndex < 0) break
-                            val line = lineBuilder.substring(0, newlineIndex).trim()
-                            lineBuilder.delete(0, newlineIndex + 1)
-                            if (line.isNotEmpty()) {
-                                handler.post { processSerialLine(line) }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    if (keepReading) {
-                        handler.post { appendLog("Read error: ${e.message}") }
-                    }
-                    break
-                }
+        dialView.onCommit = { f ->
+            dialDragging = false
+            dialFrequency = f
+            updateDialDisplay()
+            // only send (and log) if the value actually moved
+            if (Math.abs(f - lastSentFreq) > 0.0049) {
+                sendFrequency()
+                sessionLogger.log("APP", "dial → ${String.format(Locale.US, "%.2f Hz", f)} (scale ${dialView.scaleMode})")
             }
         }
-        readThread?.start()
     }
 
-    private fun processSerialLine(line: String) {
-        val text = line.trim()
-        if (text.isEmpty()) return
+    // ================= DRAWER (menu window) =================
 
-        if (text.startsWith("AI>")) {
-            appendStyledLog(text, Color.CYAN)
+    private fun setupDrawer() {
+        // swipe from the left edge opens the menu window
+        slideRoot.onLeftEdgeSwipe = { openDrawer() }
+        menuBtnMain.setOnClickListener { openDrawer() }
+        menuBtnLog.setOnClickListener { openDrawer() }
+
+        // tap the dark area behind the drawer to close it
+        scrimView.setOnClickListener { closeDrawer() }
+
+        // tap an option → go there
+        drawerMainOpt.setOnClickListener { goMain() }
+        drawerLogOpt.setOnClickListener { goLogbook() }
+
+        // swipe the drawer right to dismiss it
+        drawerView.setOnTouchListener { _, e ->
+            when (e.actionMasked) {
+                MotionEvent.ACTION_DOWN -> drawerDownX = e.x
+                MotionEvent.ACTION_UP -> if (e.x - drawerDownX > 120f) closeDrawer()
+            }
+            false
+        }
+    }
+
+    private fun drawerWidth(): Float =
+        if (drawerView.width > 0) drawerView.width.toFloat()
+        else (240f * resources.displayMetrics.density)
+
+    private fun openDrawer() {
+        if (drawerOpen || drawerAnimating) return
+        drawerAnimating = true
+        updateDrawerHighlight()
+        scrimView.visibility = View.VISIBLE
+        drawerView.visibility = View.VISIBLE
+        drawerView.translationX = -drawerWidth()
+        drawerView.animate().translationX(0f).setDuration(200).withEndAction {
+            drawerAnimating = false
+            drawerOpen = true
+        }.start()
+    }
+
+    private fun closeDrawer() {
+        if (!drawerOpen || drawerAnimating) return
+        drawerAnimating = true
+        scrimView.visibility = View.GONE
+        drawerView.animate().translationX(-drawerWidth()).setDuration(200).withEndAction {
+            drawerView.visibility = View.GONE
+            drawerAnimating = false
+            drawerOpen = false
+        }.start()
+    }
+
+    private fun goMain() {
+        if (currentScreen != 0) {
+            currentScreen = 0
+            logbookPage.visibility = View.GONE
+            mainPage.visibility = View.VISIBLE
+        }
+        closeDrawer()
+    }
+
+    private fun goLogbook() {
+        if (currentScreen != 1) {
+            currentScreen = 1
+            mainPage.visibility = View.GONE
+            logbookPage.visibility = View.VISIBLE
+            refreshSessionList()
+        }
+        closeDrawer()
+    }
+
+    private fun updateDrawerHighlight() {
+        val activeBg = 0xFF123524.toInt()
+        val idleBg = 0x00000000
+        val activeColor = 0xFF4DFFA0.toInt()
+        val idleColor = 0xFFBFE8CD.toInt()
+        val mainTitle = drawerMainOpt.getChildAt(0) as TextView
+        val logTitle = drawerLogOpt.getChildAt(0) as TextView
+        drawerMainOpt.setBackgroundColor(if (currentScreen == 0) activeBg else idleBg)
+        mainTitle.setTextColor(if (currentScreen == 0) activeColor else idleColor)
+        drawerLogOpt.setBackgroundColor(if (currentScreen == 1) activeBg else idleBg)
+        logTitle.setTextColor(if (currentScreen == 1) activeColor else idleColor)
+    }
+
+    // ================= LOGBOOK =================
+
+    private fun appendLogbookLine(line: String) {
+        if (!logbookIsLive) return
+        logbookView.append(line + "\n")
+        val s = logbookView.text.toString()
+        if (s.length > 200000) {
+            logbookView.setText(s.substring(s.length - 100000))
+        }
+        val child = logbookScroll.getChildAt(0) ?: return
+        val diff = child.bottom - (logbookScroll.height + logbookScroll.scrollY)
+        if (diff <= 200) logbookScroll.post { logbookScroll.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun refreshSessionList() {
+        sessionsList.removeAllViews()
+        val files = sessionLogger.listSessions()
+        if (files.isEmpty()) {
+            val t = makeRow("No saved sessions yet.")
+            t.setTextColor(0xFF6F9A80.toInt())
+            sessionsList.addView(t)
             return
         }
-
-        if (text.startsWith("CAP,")) {
-            val parts = text.split(",")
-            capturing = true
-            capRate = parts.getOrNull(2)?.toDoubleOrNull() ?: 0.0
-            capSamples = null
-            appendSerialLog(text)
-            return
+        val dateFmt = SimpleDateFormat("dd MMM yyyy · HH:mm:ss", Locale.US)
+        for (f in files) {
+            val t = makeRow("${f.name}\n${dateFmt.format(Date(f.lastModified()))} · ${f.length() / 1024} KB")
+            t.setTextColor(0xFFBFE8CD.toInt())
+            t.isClickable = true
+            t.setOnClickListener { openSessionFile(f) }
+            sessionsList.addView(t)
         }
-        if (capturing) {
-            if (text == "ENDCAP") {
-                capturing = false
-                onCaptureComplete()
-                return
+    }
+
+    private fun makeRow(text: String): TextView {
+        val t = TextView(this)
+        t.text = text
+        t.textSize = 10.5f
+        t.typeface = Typeface.MONOSPACE
+        t.setPadding(16, 12, 16, 12)
+        return t
+    }
+
+    private fun openSessionFile(f: File) {
+        logbookIsLive = false
+        viewerTitle.text = f.name
+        logbookView.text = "Loading…"
+        Thread {
+            val text = try { f.readText() } catch (e: Exception) { "Failed to read: ${e.message}" }
+            val shown = if (text.length > 300000)
+                text.substring(0, 300000) + "\n\n…(truncated — ${text.length} chars total)"
+            else text
+            handler.post {
+                logbookView.text = shown
+                logbookScroll.scrollTo(0, 0)
             }
-            if (text.matches(Regex("^[0-9,]+$"))) {
-                capSamples = text.split(",").mapNotNull { it.toIntOrNull() }.toIntArray()
-                return
-            }
-        }
-
-        if (text.startsWith("Target:")) {
-            appendSerialLog(text)
-            val noSignal = text.contains("NO SIGNAL")
-            Regex("Measured:\\s*([\\d.]+)").find(text)?.let {
-                if (!noSignal) lastMeasuredHz = it.groupValues[1].toDouble()
-            }
-            Regex("Duty:\\s*([\\d.]+)").find(text)?.let {
-                rDuty.text = "Duty: ${it.groupValues[1]}%"
-                scopeView.liveDuty = it.groupValues[1].toDouble()
-            }
-            lastWaveform = !noSignal
-            rMeasured.text = if (lastWaveform) String.format(Locale.US, "Measured: %.2f Hz", lastMeasuredHz)
-                              else "Measured: NO SIGNAL"
-            rRate.text = if (lastWaveform) "Signal present" else "No signal"
-
-            scopeView.liveFreq = if (lastWaveform) lastMeasuredHz else dialFrequency
-            scopeView.waveformPresent = lastWaveform
-            if (!liveCapture && scopeView.mode != "captured") scopeView.showReconstructed()
-            return
-        }
-
-        appendSerialLog(text)
-    }
-
-    private fun onCaptureComplete() {
-        val samples = capSamples ?: return
-        val freq = if (lastWaveform) lastMeasuredHz else dialFrequency
-        val spc = if (freq > 0) capRate / freq else 0.0
-
-        if (samples.isNotEmpty()) {
-            val minV = (samples.min() / 255.0) * 5.0
-            val maxV = (samples.max() / 255.0) * 5.0
-            val avgV = (samples.average() / 255.0) * 5.0
-            rVoltage.text = String.format(Locale.US, "Voltage: min %.2fV max %.2fV avg %.2fV (real ADC)", minV, maxV, avgV)
-        }
-
-        val label = when {
-            spc >= 10 -> "CAPTURED - HIGH FIDELITY"
-            spc >= 4 -> "CAPTURED - REDUCED DETAIL"
-            else -> "TOO FAST - RECONSTRUCTED"
-        }
-
-        if (spc >= 4) {
-            scopeView.showCaptured(samples, label, capRate)
-        } else {
-            scopeView.showReconstructed()
-        }
-    }
-
-    private fun disconnect() {
-        keepReading = false
-        repeatDirection = 0
-        liveCapture = false
-        handler.removeCallbacks(repeatRunnable)
-        try { readThread?.interrupt() } catch (_: Exception) {}
-        readThread = null
-        try { serial?.close() } catch (_: Exception) {}
-        serial = null
-        connStatus.text = "Disconnected"
-        connectBtn.text = "Connect"
-        appendLog("Disconnected.")
-    }
-
-    private fun appendLog(message: String) {
-        handler.post {
-            val current = logView.text.toString()
-            logView.text = if (current.isEmpty()) message else "$current\n$message"
-        }
-    }
-
-    private fun appendCommandLog(command: String) {
-        appendStyledLog(">> $command", Color.RED)
-    }
-
-    private fun appendSerialLog(message: String) {
-        appendStyledLog("<< $message", Color.GREEN)
-    }
-
-    private fun appendStyledLog(message: String, color: Int) {
-        val text = SpannableString("$message\n")
-        text.setSpan(ForegroundColorSpan(color), 0, message.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        logView.append(text)
-    }
-
-    override fun onDestroy() {
-        repeatDirection = 0
-        handler.removeCallbacks(repeatRunnable)
-        keepReading = false
-        try { unregisterReceiver(usbReceiver) } catch (_: Exception) {}
-        disconnect()
-        super.onDestroy()
-    }
-}
+     
