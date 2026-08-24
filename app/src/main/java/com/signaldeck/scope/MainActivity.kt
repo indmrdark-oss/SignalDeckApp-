@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
     private var dialFrequency = 1000.0
     private val F_MIN = 1.0
     private val F_MAX = 20000.0
-    private var hzPerDegree = 3000.0 / 360.0
+    private var hzPerDegree = 8000.0 / 360.0
 
     private var arrowSpeed = 1
     private var repeatDirection = 0
@@ -98,8 +98,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Real capture loop - this is what makes "Start Live Capture" actually
-    // pull fresh real frames repeatedly, not just toggle a label.
     private val liveCaptureLoop = object : Runnable {
         override fun run() {
             if (!liveCapture) return
@@ -243,13 +241,13 @@ class MainActivity : AppCompatActivity() {
         resetZoomBtn.setOnClickListener { scopeView.resetZoom() }
 
         coarseModeBtn.setOnClickListener {
-            hzPerDegree = 3000.0 / 360.0
-            appendLog("Dial: COARSE — 1 rotation ≈ 3000 Hz")
+            hzPerDegree = 8000.0 / 360.0
+            appendLog("Dial: COARSE — 1 rotation ≈ 8000 Hz")
         }
 
         fineModeBtn.setOnClickListener {
-            hzPerDegree = 60.0 / 360.0
-            appendLog("Dial: FINE — 1 rotation ≈ 60 Hz")
+            hzPerDegree = 300.0 / 360.0
+            appendLog("Dial: FINE — 1 rotation ≈ 300 Hz")
         }
 
         speed1xBtn.setOnClickListener { arrowSpeed = 1; appendLog("Arrow speed: 1×") }
