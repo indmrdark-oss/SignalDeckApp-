@@ -70,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sendBtn: Button
 
     private lateinit var logView: TextView
+    private lateinit var logScroll: ScrollView
     private lateinit var clearLogBtn: Button
 
     private lateinit var rTarget: TextView
@@ -232,6 +233,7 @@ class MainActivity : AppCompatActivity() {
         sendBtn = findViewById(R.id.sendBtn)
 
         logView = findViewById(R.id.logView)
+        logScroll = findViewById(R.id.logScroll)
         clearLogBtn = findViewById(R.id.clearLogBtn)
 
         rTarget = findViewById(R.id.rTarget)
@@ -820,6 +822,7 @@ class MainActivity : AppCompatActivity() {
         handler.post {
             val current = logView.text.toString()
             logView.text = if (current.isEmpty()) message else "$current\n$message"
+            logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
         }
     }
 
@@ -840,6 +843,7 @@ class MainActivity : AppCompatActivity() {
         val text = SpannableString("$message\n")
         text.setSpan(ForegroundColorSpan(color), 0, message.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         logView.append(text)
+        logScroll.post { logScroll.fullScroll(View.FOCUS_DOWN) }
     }
 
     override fun onPause() {
