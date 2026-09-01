@@ -106,7 +106,7 @@ class MainActivity : AppCompatActivity() {
 
     private var dialFrequency = 1000.0
     private val F_MIN = 1.0
-    private val F_MAX = 100000.0
+    private val F_MAX = 30000.0
 
     private var arrowSpeed = 1
     private var repeatDirection = 0
