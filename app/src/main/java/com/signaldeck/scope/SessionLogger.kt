@@ -119,7 +119,7 @@ class SessionLogger(context: Context) {
         w.writeLine("  App:         SignalDeckApp $appVersion (com.signaldeck.scope)")
         w.writeLine("  Phone:       Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}), ${Build.MANUFACTURER} ${Build.MODEL}")
         w.writeLine("  Device:      $deviceDesc")
-        w.writeLine("  Freq range:  1 Hz - 100000 Hz (app dial)")
+        w.writeLine("  Freq range:  1 Hz - 30000 Hz (app dial)")
         w.writeLine("  Voltage:     displayed min/max/avg are raw ADC 0-255 scaled to 0-5.0V;")
         w.writeLine("                real inverter voltage depends on the external divider,")
         w.writeLine("                so treat displayed voltages as RELATIVE, not absolute.")
