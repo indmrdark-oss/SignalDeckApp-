@@ -119,6 +119,19 @@ class MainActivity : AppCompatActivity() {
     private var capInFlight = false          // a C is out, waiting for ENDCAP
     private var lastCapDurationMs = 400L     // measured duration of last capture
     private var lastCmdTapMs = 0L            // last tap on the command box (keyboard fix)
+
+    // --- logbook write coalescing (keyboard fix, part 2) ---
+    // Root cause of the intermittent "keyboard stops typing" bug: every single
+    // RX line (including capture sample bursts — up to 15+ lines back to back)
+    // was posting its own Runnable straight to the main thread the instant it
+    // arrived. During a live capture or a fast dial drag that's dozens of
+    // Runnables landing in the same frame, which stutters the main thread
+    // right as the IME is trying to keep the on-screen keyboard focused —
+    // that's why it only ever happened "sometimes" and only while connected.
+    // Fix: buffer incoming lines and flush them in one batched update, and
+    // skip the flush entirely while the user has the command box focused.
+    private val pendingLogbookLines = StringBuilder()
+    private var logbookFlushScheduled = false
     private var lastMeasuredHz = 0.0
     private var lastWaveform = false
 
@@ -207,7 +220,12 @@ class MainActivity : AppCompatActivity() {
 
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
         sessionLogger = SessionLogger(this)
-        sessionLogger.onLogLine = { line -> handler.post { appendLogbookLine(line) } }
+        // Coalesced instead of one handler.post() per RX line — see
+        // scheduleLogbookFlush()/flushLogbookLines() for why (keyboard fix).
+        sessionLogger.onLogLine = { line ->
+            synchronized(pendingLogbookLines) { pendingLogbookLines.append(line).append('\n') }
+            scheduleLogbookFlush()
+        }
 
         scopeView = findViewById(R.id.scopeView)
         dialView = findViewById(R.id.dialView)
@@ -537,9 +555,32 @@ class MainActivity : AppCompatActivity() {
 
     // ================= LOGBOOK =================
 
-    private fun appendLogbookLine(line: String) {
+    private fun scheduleLogbookFlush() {
+        if (logbookFlushScheduled) return
+        logbookFlushScheduled = true
+        handler.postDelayed({ flushLogbookLines() }, 150L)
+    }
+
+    private fun flushLogbookLines() {
+        logbookFlushScheduled = false
+
+        // User is actively typing — don't touch the view tree at all right
+        // now, just try again shortly. This is the actual fix for the
+        // keyboard bug: zero main-thread UI churn while cmdInput has focus.
+        if (::cmdInput.isInitialized && cmdInput.hasFocus()) {
+            if (pendingLogbookLines.isNotEmpty()) scheduleLogbookFlush()
+            return
+        }
+
+        val chunk: String
+        synchronized(pendingLogbookLines) {
+            if (pendingLogbookLines.isEmpty()) return
+            chunk = pendingLogbookLines.toString()
+            pendingLogbookLines.setLength(0)
+        }
+
         if (!logbookIsLive) return
-        logbookView.append(line + "\n")
+        logbookView.append(chunk)
         val s = logbookView.text.toString()
         if (s.length > 200000) {
             logbookView.setText(s.substring(s.length - 100000))
@@ -687,13 +728,22 @@ class MainActivity : AppCompatActivity() {
                     if (count > 0) {
                         val chunk = String(buffer, 0, count, Charsets.US_ASCII)
                         lineBuilder.append(chunk)
+                        // Collect every complete line from this read into one
+                        // batch instead of posting a separate Runnable per
+                        // line — a capture burst can land 15-20+ lines in a
+                        // single read(), and one Runnable per line was the
+                        // main-thread churn behind the keyboard bug.
+                        val batch = ArrayList<String>()
                         while (true) {
                             val newlineIndex = lineBuilder.indexOf("\n")
                             if (newlineIndex < 0) break
                             val line = lineBuilder.substring(0, newlineIndex).trim()
                             lineBuilder.delete(0, newlineIndex + 1)
-                            if (line.isNotEmpty()) {
-                                handler.post { processSerialLine(line) }
+                            if (line.isNotEmpty()) batch.add(line)
+                        }
+                        if (batch.isNotEmpty()) {
+                            handler.post {
+                                for (line in batch) processSerialLine(line)
                             }
                         }
                     }
