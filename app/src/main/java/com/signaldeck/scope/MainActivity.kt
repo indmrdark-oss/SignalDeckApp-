@@ -823,15 +823,11 @@ class MainActivity : AppCompatActivity() {
             scopeView.waveformPresent = lastWaveform
             if (!liveCapture && scopeView.mode != "captured") scopeView.showReconstructed()
 
-            // Visible log: only when the frequency actually changes.
-            if (targetHz != null && targetHz != lastLoggedTarget) {
-                val prev = lastLoggedTarget
+            // Visible log entry for target changes intentionally removed —
+            // the top readout (rTarget) already shows it live; logging it
+            // on every change too was just noise in the log panel.
+            if (targetHz != null) {
                 lastLoggedTarget = targetHz
-                val shown = if (prev < 0)
-                    "Target: ${String.format(Locale.US, "%.2f Hz", targetHz)}"
-                else
-                    "Target: ${String.format(Locale.US, "%.2f", prev)} → ${String.format(Locale.US, "%.2f Hz", targetHz)}"
-                appendStyledLog(shown, Color.GREEN)
             }
 
             // One warning when the error gets large — not one per line.
